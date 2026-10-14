@@ -1,0 +1,11 @@
+# Local development archive, profiles and generated validation/build output
+.archive/
+.local/
+artifacts/
+dist/
+__pycache__/
+*.py[cod]
+*.blend1
+*.blend2
+.DS_Store
+.ruff_cache/

@@ -1,0 +1,10 @@
+schema_version = "1.0.0"
+id = "base_modeler"
+version = "1.0.0"
+name = "Base Modeler"
+tagline = "Shape an adult anime foundation with continuous body controls"
+maintainer = "Base Modeler contributors"
+type = "add-on"
+tags = ["Modeling", "Rigging"]
+blender_version_min = "5.2.0"
+license = ["SPDX:GPL-3.0-or-later"]
