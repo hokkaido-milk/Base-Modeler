@@ -1,6 +1,6 @@
 # Release audit
 
-The shipping extension is **Base Modeler 1.0.0**. Its runtime source is
+The shipping extension is **Base Modeler 1.0.1**. Its runtime source is
 `Base Modeler/`; `dist/Base_Modeler.zip` is built from that folder without
 changing its contents. The source contains current usage documentation,
 required asset provenance and the complete code license. Development history,
@@ -21,6 +21,12 @@ old packages and authoring references are kept in the ignored local archive.
   tolerates partial state. Older saved-model migration retains custom settings.
 - Rig removal tolerates missing or malformed stored group-name metadata while
   preserving unrelated vertex groups.
+- Limb joints fit closed skin cross sections, with corresponding mesh edges
+  carrying the fit through changes in body proportions. Wrist and palm centers
+  follow the hand's actual offset; knees, ankles and toe stations are corrected.
+  Wrist, knee and toe weight transitions now match those joint positions.
+- Existing rigs retain their saved rest positions and poses. The sidebar flags
+  older bindings for removal and regeneration to apply the corrected fit.
 - Native interpolation validates array dimensions and finite coordinates before
   entering C. NumPy remains a functional fallback.
 - Height-only edits reuse the evaluated raw shape rather than reintegrating
@@ -57,11 +63,18 @@ under `artifacts/validation/` and are excluded from Git.
 | Native / NumPy comparison | 17 mixed cases; maximum measured difference 0 m |
 | Undo / redo | Shape edits, linked length/Height edits and rig lifecycle pass |
 | Bone audit | All 22 bones translated and rotated about all three axes in both directions |
+| Limb fitting | 23 proportion cases; 2,070 sampled limb-axis points inside skin; joined chain endpoints |
+| Wrist stress | Both hands, three axes, ±60°; palms/nails follow; opposite hand unchanged; seams/reset pass |
 | Seated pose | No collapsed valid faces; seam/reset checks pass |
 | Saved files | Editable controls and length scale reopen correctly; native rig poses without plugin |
 | Materials | Source-pattern and height render comparisons pass |
 | Installation | Content ZIP and enclosing-folder ZIP install; saved startup and disable/re-enable pass |
 | Quality | Black formatting and Ruff lint checks pass |
+
+The packaged suite uses isolated Blender configuration, scripts, data and
+extension directories to prevent locally installed addons from affecting
+save/reopen checks. The installed 1.0.1 preview was also inspected interactively
+with a wrist bend, then returned to its neutral pose.
 
 Measured callback median: approximately 19 ms across the shape sweep and 8 ms
 for height-only edits. These headless measurements exclude interactive viewport

@@ -39,6 +39,12 @@ with tempfile.TemporaryDirectory(prefix="base_modeler_checks_") as tmp:
     env["BASE_MODELER_PACKAGE"] = str(package)
     env.pop("PYTHONPATH", None)
     env["PYTHONNOUSERSITE"] = "1"
+    # Saved-file checks must not inherit extensions enabled in the user's
+    # normal profile, especially the test that proves rig independence.
+    for kind in ("CONFIG", "SCRIPTS", "DATAFILES", "EXTENSIONS"):
+        path = Path(tmp) / "profile" / kind.lower()
+        path.mkdir(parents=True, exist_ok=True)
+        env["BLENDER_USER_" + kind] = str(path)
 
     def run(name, script, file=None, load=True, extra=()):
         command = [args.blender, "--background"]
@@ -76,6 +82,8 @@ with tempfile.TemporaryDirectory(prefix="base_modeler_checks_") as tmp:
     run("undo", "test_undo.py")
     run("torso", "test_torso.py")
     run("surfaces", "test_surfaces.py")
+    run("joint_fit", "test_joint_fit.py")
+    run("wrist_pose", "test_wrist_pose.py")
     run("poses", "test_poses.py")
     run("rig", "test_rig.py")
     run("rig_reopen", "test_rig_reopen.py", OUT / "rig/Native_Rig.blend", load=False)

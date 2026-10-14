@@ -4,7 +4,7 @@ import textwrap
 import bpy
 from .controls import GROUPS, CONTROLS
 from .model import model_for, _ERRORS
-from .rig import rig_for
+from .rig import rig_for, BINDING_SCHEMA
 
 
 class BM_PT_actions(bpy.types.Panel):
@@ -32,7 +32,7 @@ class BM_PT_actions(bpy.types.Panel):
                 "base_modeler.remove_rig", text="Remove Simple Rig", icon="X"
             )
             layout.label(text="Remove rig to edit body proportions.")
-            if rig.get("base_modeler_binding_schema", 1) < 2:
+            if rig.get("base_modeler_binding_schema", 1) < BINDING_SCHEMA:
                 layout.label(
                     text="Remove and regenerate to update binding.", icon="INFO"
                 )

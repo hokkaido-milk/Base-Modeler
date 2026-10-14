@@ -1,6 +1,6 @@
 schema_version = "1.0.0"
 id = "base_modeler"
-version = "1.0.0"
+version = "1.0.1"
 name = "Base Modeler"
 tagline = "Shape an adult anime foundation with continuous body controls"
 maintainer = "Base Modeler contributors"

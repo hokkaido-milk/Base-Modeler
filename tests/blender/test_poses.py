@@ -43,7 +43,7 @@ def evaluated():
 neutral = evaluated()
 assert bpy.ops.base_modeler.generate_rig() == {"FINISHED"}
 rig = bm.rig_for(root)
-assert rig["base_modeler_binding_schema"] == 2
+assert rig["base_modeler_binding_schema"] == bm.rig.BINDING_SCHEMA
 # Catch the original medial leg/foot pinning and thigh muscle attachment bugs.
 for ob, a, b in c["slices"]:
     if ob.name.startswith(("Body_Surface", "Vastus_lateralis", "Vastus_medialis")):

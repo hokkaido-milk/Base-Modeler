@@ -7,8 +7,10 @@ from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 from .pose import CENTER_X, smooth
 from .identity import region_name
+from .fitting import SkinSections
 
 TAG = "base_modeler_simple_rig"
+BINDING_SCHEMA = 3
 
 
 def rig_for(root):
@@ -36,7 +38,7 @@ def skeleton():
         return (CENTER_X, y, z)
 
     add("root", center(0, 0), center(0, 0.16), deform=False)
-    add("pelvis", center(0.015, 0.89), center(0.005, 1.07), "root")
+    add("pelvis", center(0.015, 0.97), center(0.005, 1.07), "root")
     add("spine", center(0.005, 1.07), center(0.005, 1.28), "pelvis")
     add("chest", center(0.005, 1.28), center(0.005, 1.445), "spine")
     add("neck", center(0.005, 1.445), center(0.008, 1.565), "chest")
@@ -56,46 +58,70 @@ def skeleton():
         add(
             "forearm." + side,
             p(0.39, 0.005, 1.43),
-            p(0.601, 0.005, 1.43),
+            p(0.55, -0.017, 1.436),
             "upper_arm." + side,
         )
         add(
             "hand." + side,
-            p(0.601, 0.005, 1.43),
-            p(0.68, 0.005, 1.43),
+            p(0.55, -0.017, 1.436),
+            p(0.65, -0.05, 1.42),
             "forearm." + side,
         )
-        add("thigh." + side, p(0.085, 0.015, 0.89), p(0.085, -0.005, 0.48), "pelvis")
+        add("thigh." + side, p(0.085, 0.015, 0.97), p(0.07, -0.01, 0.56), "pelvis")
         add(
             "shin." + side,
-            p(0.085, -0.005, 0.48),
-            p(0.085, 0.015, 0.09),
+            p(0.07, -0.01, 0.56),
+            p(0.06, 0.03, 0.09),
             "thigh." + side,
         )
         add(
             "foot." + side,
-            p(0.085, 0.015, 0.09),
-            p(0.085, -0.105, 0.025),
+            p(0.06, 0.03, 0.09),
+            p(0.069, -0.08, 0.012),
             "shin." + side,
         )
         add(
             "toe." + side,
-            p(0.085, -0.105, 0.025),
-            p(0.085, -0.175, 0.025),
+            p(0.069, -0.08, 0.012),
+            p(0.06, -0.12, 0.004),
             "foot." + side,
         )
     return bones
 
 
-def fit_skeleton(reference, current, skin_indices):
+def fit_skeleton(reference, current, skin_indices, skin_triangles=None):
     """Carry joint centers through nearby skin displacements, keeping chains joined."""
     source = reference[skin_indices]
     delta = current[skin_indices] - source
     memo = {}
 
-    def fit(point):
+    sections = (
+        SkinSections(source, current[skin_indices], skin_triangles)
+        if skin_triangles is not None
+        else None
+    )
+    stations = {
+        round(CENTER_X + sign * x, 6) for sign in (-1, 1) for x in (0.39, 0.55, 0.65)
+    }
+
+    def fit(point, limb=False):
         key = tuple(point)
         if key not in memo:
+            if sections is not None and limb:
+                x, y, z = point
+                if round(float(x), 6) in stations:
+                    memo[key] = sections.center(0, x, point)
+                elif abs(float(z) - 0.56) < 1e-6 or abs(float(z) - 0.09) < 1e-6:
+                    memo[key] = sections.center(2, z, point)
+                elif abs(float(y) + 0.08) < 1e-6 or abs(float(y) + 0.12) < 1e-6:
+                    memo[key] = sections.center(
+                        1,
+                        y,
+                        point,
+                        fixed_axis=0 if abs(float(y) + 0.08) < 1e-6 else None,
+                    )
+                if key in memo:
+                    return memo[key]
             d = np.linalg.norm(source - point, axis=1)
             take = np.argpartition(d, min(95, len(d) - 1))[:96]
             weights = np.exp(-(((d[take] - d[take].min()) / 0.025) ** 2))
@@ -105,7 +131,7 @@ def fit_skeleton(reference, current, skin_indices):
         return memo[key]
 
     return [
-        (name, fit(head), fit(tail), parent, deform)
+        (name, fit(head, "." in name), fit(tail, "." in name), parent, deform)
         for name, head, tail, parent, deform in skeleton()
     ]
 
@@ -144,7 +170,7 @@ def skin_weights(points, arm_ownership, names):
         # limb then blends locally around its actual elbow/wrist or knee/ankle.
         clavicle = 1 - smooth(0.12, 0.19, ax)
         fore = smooth(0.35, 0.43, ax)
-        hand = smooth(0.565, 0.625, ax)
+        hand = smooth(0.53, 0.575, ax)
         a = arms * side_mask
         for name, value in (
             ("shoulder", clavicle),
@@ -153,9 +179,9 @@ def skin_weights(points, arm_ownership, names):
             ("hand", hand),
         ):
             w[:, lookup[name + "." + side]] += a * value
-        lower = 1 - smooth(0.43, 0.54, z)
+        lower = 1 - smooth(0.51, 0.61, z)
         foot = 1 - smooth(0.065, 0.135, z)
-        toe = 1 - smooth(-0.155, -0.09, y)
+        toe = 1 - smooth(-0.095, -0.065, y)
         # A narrow bilateral transition keeps the crotch continuous under
         # unilateral hip motion and shares exact centerline points equally.
         leg_side = smooth(-0.012, 0.012, x * sign)
@@ -262,14 +288,19 @@ def generate(context, root, cache, reference):
             if region_name(ob) in ("Body_Surface", "Head")
         ]
     )
-    bones = fit_skeleton(reference, current, skin_indices)
+    skin = next(ob for ob, a, b in cache["slices"] if region_name(ob) == "Body_Surface")
+    skin.data.calc_loop_triangles()
+    triangles = np.array(
+        [triangle.vertices[:] for triangle in skin.data.loop_triangles]
+    )
+    bones = fit_skeleton(reference, current, skin_indices, triangles)
     weights = bind_weights(cache, reference, names)
     data = bpy.data.armatures.new("Base Modeler Simple Rig")
     rig = bpy.data.objects.new("Base Modeler Simple Rig", data)
     root.users_collection[0].objects.link(rig)
     rig.parent = root
     rig[TAG] = 1
-    rig["base_modeler_binding_schema"] = 2
+    rig["base_modeler_binding_schema"] = BINDING_SCHEMA
     rig["base_modeler_group_names"] = json.dumps(names)
     rig.show_in_front = True
     data.display_type = "OCTAHEDRAL"

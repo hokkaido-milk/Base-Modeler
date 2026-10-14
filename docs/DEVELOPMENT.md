@@ -37,7 +37,8 @@ python3 tools/run_checks.py --full
 ```
 
 The suite builds and extracts the ZIP to a temporary directory, then runs each
-check in a fresh Blender process. Use `--blender /path/to/blender` or set
+check in a fresh Blender process with isolated user directories. Use
+`--blender /path/to/blender` or set
 `BLENDER_BIN` on another installation. Reports and logs go to `artifacts/validation/`.
 `--full` includes rendered source-pattern and height material-stability checks.
 
@@ -70,3 +71,11 @@ preferences, and opens the clean example in a new instance. It does not change
 the user's main Blender profile. The startup check verifies that the installed
 extension enabled from saved preferences. Viewport defaults are lit Material
 Preview with the Base Modeler sidebar visible.
+
+Pass a `.blend` path to open a different file in that isolated profile. To
+prepare and inspect a neutral rig with a close-up of the fitted wrist/palm:
+
+```sh
+blender --background --factory-startup --disable-autoexec --python-exit-code 1 --python tools/load_plugin.py --python tools/prepare_rig_preview.py
+python3 tools/open_blender.py 'artifacts/rig_refinement/Base Modeler Rig.blend'
+```

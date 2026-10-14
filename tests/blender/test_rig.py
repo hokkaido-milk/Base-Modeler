@@ -45,6 +45,7 @@ elapsed = time.perf_counter() - start
 rig = rig_for(root)
 assert bpy.context.mode == "POSE" and bpy.context.object == rig
 assert len(rig.data.bones) == 22 and all(not pb.constraints for pb in rig.pose.bones)
+neutral_wrist_x = rig.data.bones["hand.L"].head_local.x
 assert np.max(abs(evaluated() - neutral)) < 1e-6
 assert not bpy.ops.base_modeler.generate_rig.poll()
 for ob, a, b in c["slices"]:
@@ -136,7 +137,7 @@ assert bpy.ops.base_modeler.generate_rig() == {"FINISHED"}
 rig = rig_for(root)
 assert np.max(abs(evaluated() - custom)) < 1e-6
 assert rig.data.bones["head"].tail_local.z > 1.8
-assert rig.data.bones["hand.L"].head_local.x > 0.65
+assert rig.data.bones["hand.L"].head_local.x > neutral_wrist_x + 0.05
 assert bpy.ops.base_modeler.remove_rig() == {"FINISHED"}
 assert bpy.ops.base_modeler.reset() == {"FINISHED"}
 assert np.max(abs(evaluated() - neutral)) < 1e-6

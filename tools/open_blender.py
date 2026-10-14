@@ -1,6 +1,7 @@
 """Install and open Base Modeler in an isolated persistent macOS Blender profile."""
 
 import os
+import argparse
 import subprocess
 import sys
 from pathlib import Path
@@ -11,7 +12,12 @@ if sys.platform != "darwin":
     raise SystemExit(
         "For other platforms, install dist/Base_Modeler.zip through Blender Preferences."
     )
-model = ROOT / "examples/Base Modeler.blend"
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument(
+    "file", nargs="?", type=Path, default=ROOT / "examples/Base Modeler.blend"
+)
+args = parser.parse_args()
+model = args.file.resolve()
 if not model.is_file():
     raise SystemExit(
         "Generate examples/Base Modeler.blend first; see docs/DEVELOPMENT.md."

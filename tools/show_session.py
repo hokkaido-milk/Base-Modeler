@@ -14,8 +14,12 @@ root = next(ob for ob in bpy.data.objects if ob.get("base_modeler_model"))
 if bpy.context.object and bpy.context.object.mode != "OBJECT":
     bpy.ops.object.mode_set(mode="OBJECT")
 bpy.ops.object.select_all(action="DESELECT")
-root.select_set(True)
-bpy.context.view_layer.objects.active = root
+rig = bm.rig_for(root)
+active = rig if rig else root
+active.select_set(True)
+bpy.context.view_layer.objects.active = active
+if rig:
+    bpy.ops.object.mode_set(mode="POSE")
 bpy.context.scene.render.engine = "BLENDER_EEVEE"
 for area in bpy.context.screen.areas:
     if area.type != "VIEW_3D":
