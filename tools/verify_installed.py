@@ -26,7 +26,7 @@ assert root.base_modeler.breast_firmness == -1.5 and not bm._ERRORS
 assert bpy.ops.base_modeler.reset() == {"FINISHED"}
 assert bpy.ops.base_modeler.generate_rig() == {"FINISHED"}
 rig = bm.rig_for(root)
-assert rig and len(rig.data.bones) == 22
+assert rig and len(rig.data.bones) == 80
 assert bpy.ops.base_modeler.remove_rig() == {"FINISHED"}
 assert not bm._ERRORS and bm.rig_for(root) is None
 report = {

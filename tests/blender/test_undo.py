@@ -51,7 +51,7 @@ assert bm.rig_for(root) is None
 assert bpy.ops.ed.redo() == {"FINISHED"}
 root = bpy.data.objects[name]
 rig = bm.rig_for(root)
-assert rig is not None and len(rig.data.bones) == 22
+assert rig is not None and len(rig.data.bones) == 80
 bpy.context.view_layer.objects.active = rig
 assert bpy.ops.base_modeler.pose_rig() == {"FINISHED"}
 assert bpy.ops.base_modeler.remove_rig() == {"FINISHED"}

@@ -17,7 +17,7 @@ class SkinSections:
         self.triangles = triangles
         self.faces = reference[triangles]
 
-    def center(self, axis, station, near, fixed_axis=None):
+    def center(self, axis, station, near, fixed_axis=None, depth_fraction=None):
         # Avoid sections passing exactly through an edge/vertex. Two tenths of
         # a micron is below the mesh tolerance and keeps crossings unambiguous.
         if np.any(abs(self.reference[:, axis] - station) < 1e-9):
@@ -95,8 +95,14 @@ class SkinSections:
                     low, high = hits[[first, second], remaining_axis]
                     if high - low < 1e-9:
                         continue
-                    fraction = float(
-                        np.clip((near[remaining_axis] - low) / (high - low), 0.25, 0.75)
+                    fraction = (
+                        float(
+                            np.clip(
+                                (near[remaining_axis] - low) / (high - low), 0.25, 0.75
+                            )
+                        )
+                        if depth_fraction is None
+                        else depth_fraction
                     )
                     center = hits[first] * (1 - fraction) + hits[second] * fraction
                     mapped = (

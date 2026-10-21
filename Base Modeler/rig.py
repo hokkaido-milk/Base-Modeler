@@ -8,9 +8,11 @@ from mathutils.bvhtree import BVHTree
 from .pose import CENTER_X, smooth
 from .identity import region_name
 from .fitting import SkinSections
+from .digits import chains, bind_digits, bind_nails
 
 TAG = "base_modeler_simple_rig"
-BINDING_SCHEMA = 3
+BINDING_SCHEMA = 4
+WEIGHT_STEPS = 32768
 
 
 def rig_for(root):
@@ -86,6 +88,11 @@ def skeleton():
             p(0.06, -0.12, 0.004),
             "foot." + side,
         )
+        for kind, _, joints, names in chains(side):
+            parent = ("hand." if kind == "finger" else "toe.") + side
+            for i, name in enumerate(names):
+                add(name, joints[i], joints[i + 1], parent)
+                parent = name
     return bones
 
 
@@ -104,12 +111,21 @@ def fit_skeleton(reference, current, skin_indices, skin_triangles=None):
         round(CENTER_X + sign * x, 6) for sign in (-1, 1) for x in (0.39, 0.55, 0.65)
     }
 
-    def fit(point, limb=False):
+    def fit(point, limb=False, digit=None):
         key = tuple(point)
         if key not in memo:
             if sections is not None and limb:
                 x, y, z = point
-                if round(float(x), 6) in stations:
+                if digit is not None:
+                    axis = 0 if digit == "finger" else 1
+                    memo[key] = sections.center(
+                        axis,
+                        point[axis],
+                        point,
+                        fixed_axis=1 - axis,
+                        depth_fraction=0.5,
+                    )
+                elif round(float(x), 6) in stations:
                     memo[key] = sections.center(0, x, point)
                 elif abs(float(z) - 0.56) < 1e-6 or abs(float(z) - 0.09) < 1e-6:
                     memo[key] = sections.center(2, z, point)
@@ -130,10 +146,23 @@ def fit_skeleton(reference, current, skin_indices, skin_triangles=None):
             )
         return memo[key]
 
-    return [
-        (name, fit(head, "." in name), fit(tail, "." in name), parent, deform)
-        for name, head, tail, parent, deform in skeleton()
-    ]
+    fitted = []
+    for name, head, tail, parent, deform in skeleton():
+        digit = (
+            "finger"
+            if name.startswith("finger_")
+            else "toe" if name.startswith("toe_") else None
+        )
+        fitted.append(
+            (
+                name,
+                fit(head, "." in name, digit),
+                fit(tail, "." in name, digit),
+                parent,
+                deform,
+            )
+        )
+    return fitted
 
 
 def skin_weights(points, arm_ownership, names):
@@ -197,7 +226,7 @@ def skin_weights(points, arm_ownership, names):
     return w
 
 
-def bind_weights(cache, reference, names):
+def bind_weights(cache, reference, names, bones):
     """Transfer the skin's binding to muscle layers so close surfaces move together."""
     skin, start, end = next(
         s for s in cache["slices"] if region_name(s[0]) == "Body_Surface"
@@ -206,6 +235,8 @@ def bind_weights(cache, reference, names):
     tri = np.array([t.vertices[:] for t in skin.data.loop_triangles])
     surface = reference[start:end]
     weights = skin_weights(reference, cache["fields"]["arm_weights"], names)
+    edges = np.array([e.vertices[:] for e in skin.data.edges], dtype=np.int32)
+    weights[start:end] = bind_digits(surface, edges, bones, names, weights[start:end])
     bvh = BVHTree.FromPolygons(surface, tri, all_triangles=True)
     for ob, a, b in cache["slices"]:
         if ob == skin or region_name(ob) == "Head":
@@ -229,6 +260,13 @@ def bind_weights(cache, reference, names):
                 bc = np.maximum([1 - s - t, s, t], 0.0)
                 bc /= bc.sum()
             weights[i] = bc @ weights[start + ids]
+    # Nails are rigid plates: bind each connected nail to its distal phalanx,
+    # rather than interpolating across an interphalangeal weight transition.
+    for ob, a, b in cache["slices"]:
+        kind = {"Fingernails": "finger", "Toenails": "toe"}.get(region_name(ob))
+        if kind:
+            edges = np.array([e.vertices[:] for e in ob.data.edges], dtype=np.int32)
+            bind_nails(reference[a:b], edges, bones, names, weights[a:b], kind)
     # The vasti originate on the femur, not the pelvis. Proximal caps must
     # follow the thigh; transferring the skin's hip blend folds these closed
     # volumes into themselves during sitting. Retain their distal knee blend.
@@ -262,8 +300,12 @@ def bind_weights(cache, reference, names):
     # Quantize once to upload equal weights in batches, with an exact residual
     # assigned to the largest influence. This keeps generation fast without
     # installing a live solver or handlers for posing.
-    ticks = np.rint(weights * 1000).astype(np.int32)
-    ticks[np.arange(len(ticks)), np.argmax(ticks, axis=1)] += 1000 - ticks.sum(1)
+    # Binary fractions sum exactly in Blender's float storage. The finer
+    # resolution avoids visible weight stair-steps on dense finger topology.
+    ticks = np.rint(weights * WEIGHT_STEPS).astype(np.int32)
+    ticks[np.arange(len(ticks)), np.argmax(ticks, axis=1)] += WEIGHT_STEPS - ticks.sum(
+        1
+    )
     return ticks
 
 
@@ -294,7 +336,16 @@ def generate(context, root, cache, reference):
         [triangle.vertices[:] for triangle in skin.data.loop_triangles]
     )
     bones = fit_skeleton(reference, current, skin_indices, triangles)
-    weights = bind_weights(cache, reference, names)
+    neutral_bones = (
+        bones
+        if np.array_equal(reference, current)
+        else fit_skeleton(reference, reference, skin_indices, triangles)
+    )
+    weights = bind_weights(cache, reference, names, neutral_bones)
+    skin_start, skin_end = next((a, b) for ob, a, b in cache["slices"] if ob == skin)
+    fitted_surface = BVHTree.FromPolygons(
+        current[skin_start:skin_end], triangles, all_triangles=True
+    )
     data = bpy.data.armatures.new("Base Modeler Simple Rig")
     rig = bpy.data.objects.new("Base Modeler Simple Rig", data)
     root.users_collection[0].objects.link(rig)
@@ -303,29 +354,70 @@ def generate(context, root, cache, reference):
     rig["base_modeler_binding_schema"] = BINDING_SCHEMA
     rig["base_modeler_group_names"] = json.dumps(names)
     rig.show_in_front = True
-    data.display_type = "OCTAHEDRAL"
+    # A long octahedron is much wider than a narrow wrist even when its axis
+    # is correctly fitted. Slender boxes show the actual shaft without hiding
+    # bones or changing the deformation skeleton.
+    data.display_type = "BBONE"
     data.pose_position = "POSE"
     try:
         bpy.ops.object.select_all(action="DESELECT")
         rig.select_set(True)
         context.view_layer.objects.active = rig
         bpy.ops.object.mode_set(mode="EDIT")
+        collections = {
+            name: data.collections.new(name)
+            for name in ("Body", "Left Hand", "Right Hand", "Left Foot", "Right Foot")
+        }
         for name, head, tail, parent, deform in bones:
             bone = data.edit_bones.new(name)
             bone.head = head
             bone.tail = tail
             bone.use_deform = deform
+            digit = name.startswith(("finger_", "toe_"))
+            width = min(
+                float(np.linalg.norm(tail - head)) * 0.055, 0.0013 if digit else 0.003
+            )
+            if "." in name:
+                clearance = min(
+                    fitted_surface.find_nearest(head * (1 - t) + tail * t)[3]
+                    for t in np.linspace(0, 1, 25)
+                )
+                width = min(width, float(clearance) * 0.22)
+            bone.bbone_x = width
+            bone.bbone_z = width
+            bone.bbone_segments = 1
+            category = (
+                (
+                    ("Left " if name.endswith(".L") else "Right ")
+                    + ("Hand" if name.startswith("finger_") else "Foot")
+                )
+                if digit
+                else "Body"
+            )
+            collections[category].assign(bone)
             if parent:
                 bone.parent = data.edit_bones[parent]
             # Disconnected parenting allows both G and R in Pose Mode. Child
             # joints still coincide at rest and inherit their parent's motion.
             bone.use_connect = False
             axis = (
-                Vector((0, 0, 1))
-                if name.startswith(
-                    ("shoulder", "upper_arm", "forearm", "hand", "foot", "toe")
+                Vector((0, 0, -1))
+                if digit
+                else (
+                    Vector((0, 0, 1))
+                    if name.startswith(
+                        (
+                            "shoulder",
+                            "upper_arm",
+                            "forearm",
+                            "hand",
+                            "finger_",
+                            "foot",
+                            "toe",
+                        )
+                    )
+                    else Vector((0, -1, 0))
                 )
-                else Vector((0, -1, 0))
             )
             bone.align_roll(axis)
         bpy.ops.object.mode_set(mode="OBJECT")
@@ -343,10 +435,16 @@ def generate(context, root, cache, reference):
                 if not positive.any():
                     continue
                 group = ob.vertex_groups.new(name=name)
-                for value in np.unique(column[positive]):
+                indices = np.flatnonzero(positive)
+                indices = indices[np.argsort(column[indices])]
+                values = column[indices]
+                batches = np.split(
+                    indices, np.flatnonzero(values[1:] != values[:-1]) + 1
+                )
+                for batch in batches:
                     group.add(
-                        np.flatnonzero(column == value).tolist(),
-                        float(value) / 1000.0,
+                        batch.tolist(),
+                        float(column[batch[0]]) / WEIGHT_STEPS,
                         "REPLACE",
                     )
             modifier = ob.modifiers.new("Base Modeler Simple Rig", "ARMATURE")

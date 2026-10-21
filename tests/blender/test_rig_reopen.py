@@ -31,15 +31,21 @@ def evaluated():
 
 
 before = evaluated()
-saved = rig.pose.bones["forearm.L"].rotation_euler.copy()
-rig.pose.bones["forearm.L"].rotation_euler.x += 0.4
-after = evaluated()
-assert np.max(abs(after - before)) > 0.03
-rig.pose.bones["forearm.L"].rotation_euler = saved
-assert np.max(abs(evaluated() - before)) < 1e-6
-assert len(meshes) == 29 and len(rig.data.bones) == 22
+for name, minimum in (
+    ("forearm.L", 0.03),
+    ("finger_index.02.L", 0.001),
+    ("toe_big.01.R", 0.001),
+):
+    saved = rig.pose.bones[name].rotation_euler.copy()
+    rig.pose.bones[name].rotation_euler.x += 0.4
+    after = evaluated()
+    assert np.max(abs(after - before)) > minimum, name
+    rig.pose.bones[name].rotation_euler = saved
+    assert np.max(abs(evaluated() - before)) < 1e-6
+assert len(meshes) == 29 and len(rig.data.bones) == 80
 report = {
     "native_saved_rig_poses": True,
+    "native_fingers_and_toes_pose": True,
     "no_base_modeler_or_rigify_required": True,
     "reset_no_drift": True,
     "passed": True,

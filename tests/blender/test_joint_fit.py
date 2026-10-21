@@ -51,6 +51,10 @@ def inside(bvh, point):
 cases = [("neutral", {})]
 for key in (
     "height",
+    "torso_leg",
+    "build",
+    "fullness",
+    "muscle",
     "arm_length",
     "hand_size",
     "arm_size",
@@ -100,9 +104,13 @@ for label, changes in cases:
     minimum = float("inf")
     tested = 0
     for side in ("L", "R"):
-        for name in ("forearm", "hand", "shin", "foot", "toe"):
+        for name in ("forearm", "hand", "shin", "foot", "toe") + tuple(
+            n.rsplit(".", 1)[0]
+            for n in lookup
+            if n.startswith(("finger_", "toe_")) and n.endswith(".L")
+        ):
             head, tail = lookup[name + "." + side]
-            for t in np.linspace(0, 1, 9):
+            for t in np.linspace(0, 1, 41 if name == "forearm" else 13):
                 point = head * (1 - t) + tail * t
                 assert inside(bvh, point), (label, name, side, t, point.tolist())
                 _, _, _, distance = bvh.find_nearest(point)

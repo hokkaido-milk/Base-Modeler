@@ -116,6 +116,7 @@ for ob, start, end in c["slices"]:
 assert collapsed == 0, collapsed
 reset()
 assert np.max(abs(evaluated() - neutral)) < 1e-6
+bone_count = len(rig.data.bones)
 assert bpy.ops.base_modeler.remove_rig() == {"FINISHED"}
 root.base_modeler.waist_size = 0.92
 assert not bm._ERRORS
@@ -123,7 +124,7 @@ report = {
     "tessellation_prepared": True,
     "idempotent": True,
     "bone_rotation_cases": len(checks),
-    "translated_bones": 22,
+    "translated_bones": bone_count,
     "seam_pairs": len(a),
     "seated_collapsed_faces": collapsed,
     "reset_no_drift": True,

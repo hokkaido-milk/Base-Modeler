@@ -1,7 +1,7 @@
 # Base Modeler
 
 Shape an adult anime body with 27 continuous controls, then generate a native
-22-bone FK rig for posing. The foundation, anatomy corrections and face texture
+80-bone FK rig for posing. The foundation, anatomy corrections and face texture
 are bundled. No external generator, Rigify or network access is required.
 
 ## Install
@@ -25,9 +25,19 @@ from Disk**, select the ZIP and enable **Base Modeler**.
 
 Save the `.blend` file to retain shape settings. A generated rig uses native
 Blender bones and modifiers and remains poseable without the plugin installed.
-The rig has no IK or finger controls. Shape controls are disabled while rigged.
+Each hand has three bones per finger (including the thumb metacarpal). Each foot
+has two bones in the big toe and three in each other toe. The `toe.L` / `toe.R`
+bones move the whole toe bank. Bone collections separate the body, hands and
+feet. Slender bone displays are sized to fit the skin, and nails follow their
+distal phalanges as rigid plates. The rig uses direct FK posing without IK.
+Positive local X rotation curls the digit bones toward the palm or sole.
+Shape controls are disabled while rigged.
 Renaming model objects does not change their region bindings. Changing topology,
 removing rest attributes, or deleting body parts invalidates slider editing.
+
+After updating the plugin, existing rigs keep their saved bones and poses. To
+apply the new digit chains and binding, remove and regenerate the simple rig.
+Removing a rig discards its pose and returns the model to its editable shape.
 
 ## Controls
 
@@ -58,6 +68,8 @@ measured Height. At the height limits, further length changes stop at the bound.
 Explicit Height edits scale the complete body. Sag sculpts the rest shape; it is
 not a physics simulation. The supplied stylized anatomy has separate muscle
 surfaces; extreme combinations or poses can retain creases or intersections.
+Strong finger and toe curls can compress small faces along the inside crease;
+this rig does not include pose-specific corrective sculpting or collision handling.
 
 Materials and the packed face texture are retained. Material Preview gives a
 lit view; viewport shading remains under your control.

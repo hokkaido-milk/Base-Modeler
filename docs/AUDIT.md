@@ -1,6 +1,6 @@
 # Release audit
 
-The shipping extension is **Base Modeler 1.0.1**. Its runtime source is
+The shipping extension is **Base Modeler 1.1.0**. Its runtime source is
 `Base Modeler/`; `dist/Base_Modeler.zip` is built from that folder without
 changing its contents. The source contains current usage documentation,
 required asset provenance and the complete code license. Development history,
@@ -27,6 +27,15 @@ old packages and authoring references are kept in the ignored local archive.
   Wrist, knee and toe weight transitions now match those joint positions.
 - Existing rigs retain their saved rest positions and poses. The sidebar flags
   older bindings for removal and regeneration to apply the corrected fit.
+- Each hand has 15 digit bones, and each foot has 14. Skin sections fit their
+  joints; local X curls toward the palm or sole. Five bone collections separate
+  the body and each hand/foot. Slim bone displays use actual skin clearance,
+  avoiding an octahedral shaft protruding through a narrow forearm.
+- Digit binding follows skin-edge distances from terminal caps, with a smooth
+  partition at webs and local capsule/thenar support. Seeds cannot jump to a
+  neighbouring toe across an air gap. Joint blends limit peak weight gradients;
+  rigid nail plates follow distal phalanges. Binary weight fractions improve
+  precision, and sorted uploads avoid scanning a complete mesh per weight value.
 - Native interpolation validates array dimensions and finite coordinates before
   entering C. NumPy remains a functional fallback.
 - Height-only edits reuse the evaluated raw shape rather than reintegrating
@@ -62,8 +71,10 @@ under `artifacts/validation/` and are excluded from Git.
 | Failure and rename cases | Update, creation and registration rollback; renamed objects and rig pass |
 | Native / NumPy comparison | 17 mixed cases; maximum measured difference 0 m |
 | Undo / redo | Shape edits, linked length/Height edits and rig lifecycle pass |
-| Bone audit | All 22 bones translated and rotated about all three axes in both directions |
-| Limb fitting | 23 proportion cases; 2,070 sampled limb-axis points inside skin; joined chain endpoints |
+| Bone audit | All 80 bones translated and rotated about all three axes in both directions |
+| Limb/digit fitting | 31 proportion cases; 29,140 sampled axis points inside skin; joined chain endpoints |
+| Forearm posing | 162 cases across neutral, short/thin and long/thin bodies; axis and displayed shaft inside own-arm skin |
+| Digit posing | 58 individual bends; 20 rigid nail plates; neighbouring nails isolated; seams/reset pass |
 | Wrist stress | Both hands, three axes, ±60°; palms/nails follow; opposite hand unchanged; seams/reset pass |
 | Seated pose | No collapsed valid faces; seam/reset checks pass |
 | Saved files | Editable controls and length scale reopen correctly; native rig poses without plugin |
@@ -73,8 +84,14 @@ under `artifacts/validation/` and are excluded from Git.
 
 The packaged suite uses isolated Blender configuration, scripts, data and
 extension directories to prevent locally installed addons from affecting
-save/reopen checks. The installed 1.0.1 preview was also inspected interactively
-with a wrist bend, then returned to its neutral pose.
+save/reopen checks. The installed preview was also inspected interactively with
+finger curls. The rig remains native Blender data without addon pose handlers.
+
+Strong curls retain small compressed faces along the inside crease. The digit
+test bounds their combined source area to 10 mm² per pose and rejects near-zero
+faces. The measured tight curl compresses two faces covering about 1.8 mm².
+These checks do not certify collision-free fists or prevent a lowered arm from
+intersecting the torso; pose-specific corrective sculpting is not included.
 
 Measured callback median: approximately 19 ms across the shape sweep and 8 ms
 for height-only edits. These headless measurements exclude interactive viewport
