@@ -22,7 +22,7 @@ root = bpy.context.object
 objects = bm.meshes_for(root)
 skin = next(o for o in objects if o.name.startswith("Body_Surface"))
 assert repair_tessellation(objects) == 0
-assert skin["base_modeler_tessellation_schema"] == 1
+assert skin["base_modeler_tessellation_schema"] == 2
 c = bm.cache_for(root)
 
 

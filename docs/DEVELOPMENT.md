@@ -48,7 +48,7 @@ Run these only on the generated foundation/environment, since cleanup removes
 unrelated scene objects and unused data:
 
 ```sh
-blender --background 'Base Modeler/assets/foundation.blend' --disable-autoexec --python-exit-code 1 --python tools/load_plugin.py --python tools/clean_assets.py
+blender --background --factory-startup 'Base Modeler/assets/foundation.blend' --disable-autoexec --python-exit-code 1 --python tools/load_plugin.py --python tools/clean_assets.py
 blender --background --factory-startup --disable-autoexec --python-exit-code 1 --python tools/load_plugin.py --python tools/prepare_example.py
 ```
 
@@ -73,7 +73,7 @@ extension enabled from saved preferences. Viewport defaults are lit Material
 Preview with the Base Modeler sidebar visible.
 
 Pass a `.blend` path to open a different file in that isolated profile. To
-prepare and inspect a neutral rig with a close-up of the fitted wrist/palm:
+prepare and inspect a neutral rig with a full-body view with the core control selected:
 
 ```sh
 blender --background --factory-startup --disable-autoexec --python-exit-code 1 --python tools/load_plugin.py --python tools/prepare_rig_preview.py

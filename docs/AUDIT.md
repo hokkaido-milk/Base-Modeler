@@ -1,6 +1,6 @@
 # Release audit
 
-The shipping extension is **Base Modeler 1.1.0**. Its runtime source is
+The shipping extension is **Base Modeler 1.2.0**. Its runtime source is
 `Base Modeler/`; `dist/Base_Modeler.zip` is built from that folder without
 changing its contents. The source contains current usage documentation,
 required asset provenance and the complete code license. Development history,
@@ -36,6 +36,27 @@ old packages and authoring references are kept in the ignored local archive.
   neighbouring toe across an air gap. Joint blends limit peak weight gradients;
   rigid nail plates follow distal phalanges. Binary weight fractions improve
   precision, and sorted uploads avoid scanning a complete mesh per weight value.
+- The breast reference has a wider, softer dome and a less projecting apex.
+  Size uses a broad elliptical ownership region and grows the volume around its
+  chest root, spreading growth over the upper and side contours. The existing
+  gap, sag and firmness controls retain their ranges. Unrigged saved models
+  refresh through shape schema 14; rigged meshes retain their saved shape.
+- The supplied X Bot FBX was inspected locally for its hip-led FK hierarchy,
+  head/neck separation and leg joint directions. It remains an unbundled reference;
+  no Mixamo meshes, weights or assets are copied into the extension.
+- A central `core` bone carries the torso and translates the hips together.
+  Two native pelvis constraints share 35% of core rotation and its full translation.
+  Spine and pelvis remain separately poseable; root transforms still carry all parts.
+- Face/chin weights are rigid to the head below the skull pivot, with a spatial
+  blend reserved for the neck. Hip weights use a broader anterior transition;
+  front thigh muscle caps travel primarily with the femur to reduce folding.
+- Selected long hip quads use the diagonal with better triangle area balance,
+  preventing the lower buttock rim from collapsing during combined contraction.
+  Vertices, rest coordinates and UVs remain intact; tessellation schema 2 applies
+  this once to the supplied topology and rejects user-modified topology as before.
+- The source neck is shortened 12 mm before measured-height normalization;
+  the chin is broadened and its tip lifted slightly. A smooth radial correction
+  rounds the buttock shell, and Butt Size grows its width, height and projection.
 - Native interpolation validates array dimensions and finite coordinates before
   entering C. NumPy remains a functional fallback.
 - Height-only edits reuse the evaluated raw shape rather than reintegrating
@@ -68,14 +89,16 @@ under `artifacts/validation/` and are excluded from Git.
 | Packaged shape sweep | 151 endpoint, combined and mixed cases pass |
 | Regional seams / triangle collapse | Exact shared borders; no collapsed valid source triangles |
 | Reset / length isolation | All 27 field resets, 13 region resets, Reset All and height limits pass |
+| Breast contour | Both sides at Size 0, 1.25 and 2.5 retain a broad front cap; reference correction leaves unrelated regions unchanged |
 | Failure and rename cases | Update, creation and registration rollback; renamed objects and rig pass |
 | Native / NumPy comparison | 17 mixed cases; maximum measured difference 0 m |
 | Undo / redo | Shape edits, linked length/Height edits and rig lifecycle pass |
-| Bone audit | All 80 bones translated and rotated about all three axes in both directions |
+| Bone audit | All 81 bones translated and rotated about all three axes in both directions |
 | Limb/digit fitting | 31 proportion cases; 29,140 sampled axis points inside skin; joined chain endpoints |
 | Forearm posing | 162 cases across neutral, short/thin and long/thin bodies; axis and displayed shaft inside own-arm skin |
 | Digit posing | 58 individual bends; 20 rigid nail plates; neighbouring nails isolated; seams/reset pass |
 | Wrist stress | Both hands, three axes, ±60°; palms/nails follow; opposite hand unchanged; seams/reset pass |
+| Head / core / hips | Rigid face under six head turns; three core axes with partial hip response; rigid core translation; bilateral flexion, extension, abduction and twist |
 | Seated pose | No collapsed valid faces; seam/reset checks pass |
 | Saved files | Editable controls and length scale reopen correctly; native rig poses without plugin |
 | Materials | Source-pattern and height render comparisons pass |

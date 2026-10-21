@@ -32,6 +32,7 @@ def evaluated():
 
 before = evaluated()
 for name, minimum in (
+    ("core", 0.03),
     ("forearm.L", 0.03),
     ("finger_index.02.L", 0.001),
     ("toe_big.01.R", 0.001),
@@ -42,7 +43,7 @@ for name, minimum in (
     assert np.max(abs(after - before)) > minimum, name
     rig.pose.bones[name].rotation_euler = saved
     assert np.max(abs(evaluated() - before)) < 1e-6
-assert len(meshes) == 29 and len(rig.data.bones) == 80
+assert len(meshes) == 29 and len(rig.data.bones) == 81
 report = {
     "native_saved_rig_poses": True,
     "native_fingers_and_toes_pose": True,

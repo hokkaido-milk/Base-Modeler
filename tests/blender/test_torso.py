@@ -19,6 +19,7 @@ rest = cache["rest"]
 fields = cache["fields"]
 base = defaults()
 neutral = bm.evaluate(rest, fields, base)
+raw_neutral = bm.evaluate(rest, fields, base, normalize_height=False)
 side = np.sign(rest[:, 0] - CENTER_X)
 # Full arm ownership outside the shoulder attachment, including upper/lower
 # arms, wrists and hands. Compare exact vectors, not just a silhouette bound.
@@ -36,11 +37,13 @@ for ob, start, end in cache["slices"]:
     e = e.reshape(-1, 2) + start
     reference = fields["reference"]
     a = np.linalg.norm(reference[e[:, 1]] - reference[e[:, 0]], axis=1)
-    b = np.linalg.norm(neutral[e[:, 1]] - neutral[e[:, 0]], axis=1)
+    b = np.linalg.norm(raw_neutral[e[:, 1]] - raw_neutral[e[:, 0]], axis=1)
     valid = a > 1e-5
     error = float(np.max(abs(b[valid] / a[valid] - 1.0)))
     assert error < 0.003, (ob.name, error)
     rigid.append({"mesh": ob.name, "maximum_edge_length_ratio_error": error})
+# Transport distances are defined in source meters, before the global Height
+# control rescales the shortened neck and the rest of the body together.
 checks = []
 for control in (
     "shoulder_span",
@@ -53,18 +56,18 @@ for control in (
     for value in (c.minimum, c.maximum):
         vals = dict(base)
         vals[control] = value
-        q = bm.evaluate(rest, fields, vals)
+        q = bm.evaluate(rest, fields, vals, normalize_height=False)
         expected = np.zeros_like(q[arm])
         if control == "shoulder_span":
             expected[:, 0] = side[arm] * SHOULDER_X * (value - 1.0)
-        error = float(np.max(abs(q[arm] - neutral[arm] - expected)))
+        error = float(np.max(abs(q[arm] - raw_neutral[arm] - expected)))
         assert error < 2e-6, (control, value, error)
         checks.append(
             {"control": control, "value": value, "maximum_arm_transport_error_m": error}
         )
 # Independence still holds when arm size/length are already customized.
 custom = dict(base, arm_size=1.12, arm_length=1.08, hand_size=0.92)
-custom_neutral = bm.evaluate(rest, fields, custom)
+custom_neutral = bm.evaluate(rest, fields, custom, normalize_height=False)
 for value in (0.85, 1.15):
     vals = dict(
         custom,
@@ -73,7 +76,7 @@ for value in (0.85, 1.15):
         waist_size=value,
         hip_size=value,
     )
-    q = bm.evaluate(rest, fields, vals)
+    q = bm.evaluate(rest, fields, vals, normalize_height=False)
     expected = np.zeros_like(q[arm])
     expected[:, 0] = side[arm] * SHOULDER_X * (value - 1.0)
     error = float(np.max(abs(q[arm] - custom_neutral[arm] - expected)))

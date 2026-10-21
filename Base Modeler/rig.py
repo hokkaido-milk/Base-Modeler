@@ -11,7 +11,7 @@ from .fitting import SkinSections
 from .digits import chains, bind_digits, bind_nails
 
 TAG = "base_modeler_simple_rig"
-BINDING_SCHEMA = 4
+BINDING_SCHEMA = 5
 WEIGHT_STEPS = 32768
 
 
@@ -40,11 +40,12 @@ def skeleton():
         return (CENTER_X, y, z)
 
     add("root", center(0, 0), center(0, 0.16), deform=False)
+    add("core", center(0.015, 0.97), center(0.005, 1.07), "root", deform=False)
     add("pelvis", center(0.015, 0.97), center(0.005, 1.07), "root")
-    add("spine", center(0.005, 1.07), center(0.005, 1.28), "pelvis")
+    add("spine", center(0.005, 1.07), center(0.005, 1.28), "core")
     add("chest", center(0.005, 1.28), center(0.005, 1.445), "spine")
-    add("neck", center(0.005, 1.445), center(0.008, 1.565), "chest")
-    add("head", center(0.008, 1.565), center(0.008, 1.735), "neck")
+    add("neck", center(0.005, 1.445), center(0.008, 1.563), "chest")
+    add("head", center(0.008, 1.563), center(0.008, 1.733), "neck")
     for side, sign in (("L", 1), ("R", -1)):
 
         def p(x, y, z):
@@ -186,11 +187,22 @@ def skin_weights(points, arm_ownership, names):
             else 1 - smooth(levels[i], levels[i + 1], z)
         )
         w[:, lookup[name]] = low * high
+    face = (1 - smooth(-0.060, -0.020, y)) * smooth(1.495, 1.520, z)
+    head = np.maximum(smooth(1.515, 1.565, z), face)
+    # Retain the chest/neck transition, replacing only the neck/head split.
+    neck_head = w[:, lookup["neck"]] + w[:, lookup["head"]]
+    w[:, lookup["head"]] = neck_head * head
+    w[:, lookup["neck"]] = neck_head - w[:, lookup["head"]]
     # The medial crotch blends into the pelvis only near the hip. Applying
     # this width gate down the entire leg pins inner knees, ankles and toes
     # to the pelvis and tears their silhouette when the thigh rotates.
     medial_offset = 0.08 * (1 - smooth(0.015, 0.065, ax))
-    legs = 1 - smooth(0.82 - medial_offset, 0.98 - medial_offset, z)
+    front_hip = 1 - smooth(-0.035, 0.045, y)
+    legs = 1 - smooth(
+        0.84 + 0.035 * front_hip - medial_offset,
+        0.99 + 0.055 * front_hip - medial_offset,
+        z,
+    )
     arms = arm_ownership * smooth(1.25, 1.36, z)
     w *= ((1 - arms) * (1 - legs))[:, None]
     for side, sign in (("L", 1), ("R", -1)):
@@ -271,14 +283,31 @@ def bind_weights(cache, reference, names, bones):
     # follow the thigh; transferring the skin's hip blend folds these closed
     # volumes into themselves during sitting. Retain their distal knee blend.
     for ob, a, b in cache["slices"]:
-        if region_name(ob) not in ("Vastus_lateralis", "Vastus_medialis"):
+        if region_name(ob) not in (
+            "Vastus_lateralis",
+            "Vastus_medialis",
+            "Rectus_femoris",
+        ):
             continue
         for side, sign in (("L", 1), ("R", -1)):
             ids = np.arange(a, b)[(reference[a:b, 0] - CENTER_X) * sign >= 0]
             pelvis = names.index("pelvis")
             thigh = names.index("thigh." + side)
-            weights[ids, thigh] += weights[ids, pelvis]
-            weights[ids, pelvis] = 0.0
+            # The rectus retains a small proximal pelvic attachment. Its
+            # thick cap must travel mostly with the femur to avoid a folded
+            # lip when lifting the knee, while the vasti attach to the femur.
+            retained = (
+                0.15 * smooth(0.93, 1.02, reference[ids, 2])
+                if region_name(ob) == "Rectus_femoris"
+                else 0.0
+            )
+            proximal = weights[ids, pelvis].copy()
+            if region_name(ob) == "Rectus_femoris":
+                spine = names.index("spine")
+                proximal += weights[ids, spine]
+                weights[ids, spine] = 0.0
+            weights[ids, thigh] += proximal * (1 - retained)
+            weights[ids, pelvis] = proximal * retained
     # Nearest skin correspondences can switch abruptly across a closed muscle
     # wall. Fair that transferred field along its own edges before binding;
     # this reduces sharp weight steps without a live modifier or pose handler.
@@ -421,6 +450,28 @@ def generate(context, root, cache, reference):
             )
             bone.align_roll(axis)
         bpy.ops.object.mode_set(mode="OBJECT")
+        # A Mixamo-style central control carries the torso and shares its
+        # motion with the hips. Independent spine/pelvis edits remain available.
+        pelvis = rig.pose.bones["pelvis"]
+        follow = pelvis.constraints.new("COPY_ROTATION")
+        follow.name = "Core hip follow"
+        follow.target = rig
+        follow.subtarget = "core"
+        follow.target_space = "LOCAL"
+        follow.owner_space = "LOCAL"
+        follow.mix_mode = "BEFORE"
+        follow.influence = 0.35
+        carry = pelvis.constraints.new("COPY_LOCATION")
+        carry.name = "Core translation"
+        carry.target = rig
+        carry.subtarget = "core"
+        carry.target_space = "LOCAL"
+        carry.owner_space = "LOCAL"
+        carry.use_offset = True
+        # The core and pelvis share a rest pivot. A larger wire envelope makes
+        # the core easy to distinguish without adding scene mesh objects.
+        data.bones["core"].bbone_x = 0.014
+        data.bones["core"].bbone_z = 0.014
         for pb in rig.pose.bones:
             pb.rotation_mode = "XYZ"
             pb.bone.color.palette = (

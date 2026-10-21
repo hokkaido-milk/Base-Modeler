@@ -15,18 +15,18 @@ assert bpy.ops.base_modeler.generate_rig() == {"FINISHED"}
 rig = bm.rig_for(root)
 for bone in rig.pose.bones:
     bone.select = False
-rig.pose.bones["hand.L"].select = True
-rig.data.bones.active = rig.data.bones["hand.L"]
+rig.pose.bones["core"].select = True
+rig.data.bones.active = rig.data.bones["core"]
 for screen in bpy.data.screens:
     for area in screen.areas:
         for space in area.spaces:
             if space.type != "VIEW_3D":
                 continue
-            space.region_3d.view_location = Vector((0.61, -0.035, 1.424))
-            space.region_3d.view_rotation = Vector((0, -0.7, -1)).to_track_quat(
+            space.region_3d.view_location = Vector((-0.00455, 0, 0.94))
+            space.region_3d.view_rotation = Vector((-0.15, 1, -0.07)).to_track_quat(
                 "-Z", "Y"
             )
-            space.region_3d.view_distance = 0.48
+            space.region_3d.view_distance = 3.1
             space.shading.type = "MATERIAL"
             space.shading.use_scene_lights = False
             space.shading.use_scene_world = False

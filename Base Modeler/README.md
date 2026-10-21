@@ -1,7 +1,7 @@
 # Base Modeler
 
 Shape an adult anime body with 27 continuous controls, then generate a native
-80-bone FK rig for posing. The foundation, anatomy corrections and face texture
+81-bone FK rig for posing. The foundation, anatomy corrections and face texture
 are bundled. No external generator, Rigify or network access is required.
 
 ## Install
@@ -31,12 +31,17 @@ bones move the whole toe bank. Bone collections separate the body, hands and
 feet. Slender bone displays are sized to fit the skin, and nails follow their
 distal phalanges as rigid plates. The rig uses direct FK posing without IK.
 Positive local X rotation curls the digit bones toward the palm or sole.
-Shape controls are disabled while rigged.
+The `core` control carries the torso and shares 35% of its rotation with the
+hips; translation carries the whole body. Use `spine` and `chest` for additional
+upper-body bends, and `pelvis` for a separate hip adjustment. Positive local X
+on either thigh lifts the knee forward; negative local X on the shin bends the
+knee. The face and chin follow the head rigidly, with blending confined to the
+neck attachment. Shape controls are disabled while rigged.
 Renaming model objects does not change their region bindings. Changing topology,
 removing rest attributes, or deleting body parts invalidates slider editing.
 
 After updating the plugin, existing rigs keep their saved bones and poses. To
-apply the new digit chains and binding, remove and regenerate the simple rig.
+apply the current anatomy and binding, remove and regenerate the simple rig.
 Removing a rig discards its pose and returns the model to its editable shape.
 
 ## Controls
@@ -62,6 +67,12 @@ Height ranges from **120–200 cm**. Breast Size ranges from **-1–2.5**,
 Breast Firmness / sag from **-1.5–1**, Butt Size from **-1–2**, and Hip Size
 and Thigh Thickness from **0.85–1.3**. Most other ratios range from 0.85–1.15.
 The slider bounds are the authoritative limits.
+
+The breast contour has a broad, rounded dome. Size grows the width, height and
+projection together, with a soft transition into the chest instead of a pointed tip.
+The buttocks use a rounded rear volume and softer lower corners; Size grows all
+three dimensions together. The neutral neck is slightly shorter and the chin
+has a broader, softer tip.
 
 Thigh and lower-leg length edits carry the torso without resizing it and update
 measured Height. At the height limits, further length changes stop at the bound.

@@ -16,7 +16,7 @@ cache = bm.cache_for(root)
 neutral = cache["last_result"].copy()
 assert bpy.ops.base_modeler.generate_rig() == {"FINISHED"}
 rig = bm.rig_for(root)
-assert len(rig.data.bones) == 80
+assert len(rig.data.bones) == 81
 assert rig.data.display_type == "BBONE"
 assert len(rig.data.collections) == 5
 

@@ -76,11 +76,18 @@ def _velocity_fields(rest):
         * bell(ax, 0.070, 0.085)
         * smooth(0.004, 0.028, ax)
     )
+    breast_radius = np.sqrt(((ax - 0.070) / 0.075) ** 2 + ((z - 1.305) / 0.095) ** 2)
+    breast_volume = (
+        body
+        * front
+        * (1 - smooth(0.55, 1.20, breast_radius))
+        * smooth(0.004, 0.028, ax)
+    )
     put(
         "breast_size",
-        (x - side * 0.07) * breast * 0.36,
-        -0.035 * breast,
-        (z - 1.305) * breast * 0.25,
+        (x - side * 0.07) * breast_volume * 0.36,
+        (y + 0.065) * 0.36 * breast_volume,
+        (z - 1.305) * breast_volume * 0.30,
     )
     put("breast_gap", side * 0.018 * breast)
     # A negative amount rotates the projecting tip downward about its chest root.

@@ -44,7 +44,9 @@ assert bpy.ops.base_modeler.generate_rig() == {"FINISHED"}
 elapsed = time.perf_counter() - start
 rig = rig_for(root)
 assert bpy.context.mode == "POSE" and bpy.context.object == rig
-assert len(rig.data.bones) == 80 and all(not pb.constraints for pb in rig.pose.bones)
+assert len(rig.data.bones) == 81
+assert len(rig.pose.bones["pelvis"].constraints) == 2
+assert all(not pb.constraints for pb in rig.pose.bones if pb.name != "pelvis")
 neutral_wrist_x = rig.data.bones["hand.L"].head_local.x
 assert np.max(abs(evaluated() - neutral)) < 1e-6
 assert not bpy.ops.base_modeler.generate_rig.poll()
