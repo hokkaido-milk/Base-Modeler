@@ -11,7 +11,7 @@ from .fitting import SkinSections
 from .digits import chains, bind_digits, bind_nails
 
 TAG = "base_modeler_simple_rig"
-BINDING_SCHEMA = 5
+BINDING_SCHEMA = 6
 WEIGHT_STEPS = 32768
 
 
@@ -40,9 +40,9 @@ def skeleton():
         return (CENTER_X, y, z)
 
     add("root", center(0, 0), center(0, 0.16), deform=False)
-    add("core", center(0.015, 0.97), center(0.005, 1.07), "root", deform=False)
-    add("pelvis", center(0.015, 0.97), center(0.005, 1.07), "root")
-    add("spine", center(0.005, 1.07), center(0.005, 1.28), "core")
+    add("core", center(0.015, 0.97), center(0.005, 1.12), "root", deform=False)
+    add("pelvis", center(0.015, 0.97), center(0.005, 1.12), "root")
+    add("spine", center(0.005, 1.12), center(0.005, 1.28), "core")
     add("chest", center(0.005, 1.28), center(0.005, 1.445), "spine")
     add("neck", center(0.005, 1.445), center(0.008, 1.563), "chest")
     add("head", center(0.008, 1.563), center(0.008, 1.733), "neck")
@@ -177,7 +177,11 @@ def skin_weights(points, arm_ownership, names):
     ax = abs(x)
     # Interpolate the torso through the spine, then give the complete face and
     # cranium to the head. The matching neck boundary receives identical weights.
-    levels = np.array([0.98, 1.12, 1.31, 1.465, 1.565])
+    # The iliac crest and sacrum belong to the pelvis. Begin the lumbar
+    # blend above them, spreading abdominal motion through the waist rather
+    # than dragging the gluteal origins up with the lower spine.
+    rear = smooth(-0.025, 0.045, y)
+    levels = (1.035 + 0.045 * rear, 1.235, 1.34, 1.465, 1.565)
     torso = ("pelvis", "spine", "chest", "neck", "head")
     for i, name in enumerate(torso):
         low = np.ones(count) if i == 0 else smooth(levels[i - 1], levels[i], z)
@@ -251,7 +255,14 @@ def bind_weights(cache, reference, names, bones):
     weights[start:end] = bind_digits(surface, edges, bones, names, weights[start:end])
     bvh = BVHTree.FromPolygons(surface, tri, all_triangles=True)
     for ob, a, b in cache["slices"]:
-        if ob == skin or region_name(ob) == "Head":
+        # The broad abdominal sheets need a coherent lumbar field through
+        # their thickness. Nearest skin samples can jump along their raised
+        # rims and create local stretching even when the skin blend is smooth.
+        if ob == skin or region_name(ob) in (
+            "Head",
+            "Rectus_abdominis",
+            "External_oblique",
+        ):
             continue
         for i in range(a, b):
             co, _, face, _ = bvh.find_nearest(reference[i])
@@ -272,6 +283,16 @@ def bind_weights(cache, reference, names, bones):
                 bc = np.maximum([1 - s - t, s, t], 0.0)
                 bc /= bc.sum()
             weights[i] = bc @ weights[start + ids]
+    # Gluteal muscles originate on the pelvis/sacrum, not the lumbar spine.
+    # Keep their hip/thigh blend, but remove torso influence transferred from
+    # nearby lower-back skin at their thin upper rims.
+    for ob, a, b in cache["slices"]:
+        if region_name(ob) in ("Gluteus_maximus", "Gluteus_medius"):
+            pelvis = names.index("pelvis")
+            for name in ("spine", "chest", "neck", "head"):
+                column = names.index(name)
+                weights[a:b, pelvis] += weights[a:b, column]
+                weights[a:b, column] = 0.0
     # Nails are rigid plates: bind each connected nail to its distal phalanx,
     # rather than interpolating across an interphalangeal weight transition.
     for ob, a, b in cache["slices"]:

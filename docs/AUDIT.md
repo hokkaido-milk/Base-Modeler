@@ -1,6 +1,6 @@
 # Release audit
 
-The shipping extension is **Base Modeler 1.2.0**. Its runtime source is
+The shipping extension is **Base Modeler 1.2.1**. Its runtime source is
 `Base Modeler/`; `dist/Base_Modeler.zip` is built from that folder without
 changing its contents. The source contains current usage documentation,
 required asset provenance and the complete code license. Development history,
@@ -47,6 +47,11 @@ old packages and authoring references are kept in the ignored local archive.
 - A central `core` bone carries the torso and translates the hips together.
   Two native pelvis constraints share 35% of core rotation and its full translation.
   Spine and pelvis remain separately poseable; root transforms still carry all parts.
+- The lumbar pivot sits at the waist, with a broader pelvis/spine blend above
+  the pelvic crest. Gluteal weights retain their hip/thigh blend but receive no
+  spine influence. Abdominal sheets use a coherent spatial field through their
+  thickness instead of nearest-skin samples at raised rims. Binding schema 6
+  applies these changes to newly generated rigs.
 - Face/chin weights are rigid to the head below the skull pivot, with a spatial
   blend reserved for the neck. Hip weights use a broader anterior transition;
   front thigh muscle caps travel primarily with the femur to reduce folding.
@@ -99,6 +104,7 @@ under `artifacts/validation/` and are excluded from Git.
 | Digit posing | 58 individual bends; 20 rigid nail plates; neighbouring nails isolated; seams/reset pass |
 | Wrist stress | Both hands, three axes, ±60°; palms/nails follow; opposite hand unchanged; seams/reset pass |
 | Head / core / hips | Rigid face under six head turns; three core axes with partial hip response; rigid core translation; bilateral flexion, extension, abduction and twist |
+| Lumbar bends | Forward/backward 20° and 40° on neutral and fuller hips; gluteal origins stay fixed; abdominal strain and reset checked |
 | Seated pose | No collapsed valid faces; seam/reset checks pass |
 | Saved files | Editable controls and length scale reopen correctly; native rig poses without plugin |
 | Materials | Source-pattern and height render comparisons pass |
