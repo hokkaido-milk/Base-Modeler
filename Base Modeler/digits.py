@@ -130,12 +130,13 @@ def bind_digits(points, edges, bones, names, weights):
             # A soft partition around the web avoids a discontinuity where two
             # digits meet. Farther along each digit the skin route to its
             # neighbours is long, so their influence is exactly zero.
-            membership = 1 - smooth(
-                0,
-                0.009 if kind == "finger" else 0.006,
-                distance - distance.min(1)[:, None],
-            )
-            membership /= membership.sum(1)[:, None]
+            with np.errstate(invalid="ignore"):
+                excess = distance - distance.min(1)[:, None]
+            # Skin cut off from every digit (inf - inf) keeps its hand/foot
+            # weights instead of propagating NaN into the binding.
+            excess[~np.isfinite(excess)] = np.inf
+            membership = 1 - smooth(0, 0.009 if kind == "finger" else 0.006, excess)
+            membership /= np.maximum(membership.sum(1)[:, None], 1e-20)
             digit_names = [name for _, bone_names, _ in entries for name in bone_names]
             columns = [names.index(name) for name in digit_names]
             lookup = {name: i for i, name in enumerate(digit_names)}

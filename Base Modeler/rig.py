@@ -8,10 +8,13 @@ from mathutils.bvhtree import BVHTree
 from .pose import CENTER_X, smooth
 from .identity import region_name
 from .fitting import SkinSections
-from .digits import chains, bind_digits, bind_nails
+from .digits import chains, bind_digits, bind_nails, joint_blend
+from .limits import install_limits
 
 TAG = "base_modeler_simple_rig"
-BINDING_SCHEMA = 6
+BINDING_SCHEMA = 7
+# The first binding schema with native joint limits and root/core-only moves.
+LIMITS_SCHEMA = 7
 WEIGHT_STEPS = 32768
 
 
@@ -68,6 +71,12 @@ def skeleton():
             "hand." + side,
             p(0.55, -0.017, 1.436),
             p(0.65, -0.05, 1.42),
+            "forearm." + side,
+        )
+        add(
+            "forearm_twist." + side,
+            p(0.39, 0.005, 1.43),
+            p(0.55, -0.017, 1.436),
             "forearm." + side,
         )
         add("thigh." + side, p(0.085, 0.015, 0.97), p(0.07, -0.01, 0.56), "pelvis")
@@ -202,9 +211,12 @@ def skin_weights(points, arm_ownership, names):
     # to the pelvis and tears their silhouette when the thigh rotates.
     medial_offset = 0.08 * (1 - smooth(0.015, 0.065, ax))
     front_hip = 1 - smooth(-0.035, 0.045, y)
+    # The gluteal/hamstring soft tissue spans a longer posterior attachment
+    # than the anterior hip crease. Spread that bend over 22 cm instead of
+    # concentrating seated-pose strain in a short band under the buttock.
     legs = 1 - smooth(
-        0.84 + 0.035 * front_hip - medial_offset,
-        0.99 + 0.055 * front_hip - medial_offset,
+        0.80 + 0.075 * front_hip - medial_offset,
+        1.02 + 0.025 * front_hip - medial_offset,
         z,
     )
     arms = arm_ownership * smooth(1.25, 1.36, z)
@@ -214,7 +226,7 @@ def skin_weights(points, arm_ownership, names):
         # A short clavicle transition seats the shoulder on the chest. Each
         # limb then blends locally around its actual elbow/wrist or knee/ankle.
         clavicle = 1 - smooth(0.12, 0.19, ax)
-        fore = smooth(0.35, 0.43, ax)
+        fore = joint_blend(0.35, 0.43, ax)
         hand = smooth(0.53, 0.575, ax)
         a = arms * side_mask
         for name, value in (
@@ -224,7 +236,7 @@ def skin_weights(points, arm_ownership, names):
             ("hand", hand),
         ):
             w[:, lookup[name + "." + side]] += a * value
-        lower = 1 - smooth(0.51, 0.61, z)
+        lower = 1 - joint_blend(0.51, 0.61, z)
         foot = 1 - smooth(0.065, 0.135, z)
         toe = 1 - smooth(-0.095, -0.065, y)
         # A narrow bilateral transition keeps the crotch continuous under
@@ -242,6 +254,28 @@ def skin_weights(points, arm_ownership, names):
     return w
 
 
+def _barycentric(points, corners):
+    """Clamped barycentric coordinates of points projected onto their triangles."""
+    pa = corners[:, 0]
+    u = corners[:, 1] - pa
+    v = corners[:, 2] - pa
+    r = points - pa
+    uu = np.einsum("ij,ij->i", u, u)
+    uv = np.einsum("ij,ij->i", u, v)
+    vv = np.einsum("ij,ij->i", v, v)
+    ru = np.einsum("ij,ij->i", r, u)
+    rv = np.einsum("ij,ij->i", r, v)
+    den = uu * vv - uv * uv
+    degenerate = den < 1e-20
+    safe = np.where(degenerate, 1.0, den)
+    s = (ru * vv - rv * uv) / safe
+    t = (rv * uu - ru * uv) / safe
+    bc = np.maximum(np.column_stack((1 - s - t, s, t)), 0.0)
+    bc /= np.maximum(bc.sum(1)[:, None], 1e-20)
+    bc[degenerate] = (1.0, 0.0, 0.0)
+    return bc
+
+
 def bind_weights(cache, reference, names, bones):
     """Transfer the skin's binding to muscle layers so close surfaces move together."""
     skin, start, end = next(
@@ -253,36 +287,38 @@ def bind_weights(cache, reference, names, bones):
     weights = skin_weights(reference, cache["fields"]["arm_weights"], names)
     edges = np.array([e.vertices[:] for e in skin.data.edges], dtype=np.int32)
     weights[start:end] = bind_digits(surface, edges, bones, names, weights[start:end])
+    # Keep elbow flexion in both influences but distribute axial rotation along
+    # the forearm. The hidden helper cancels 75% of its parent's local Y twist.
+    # Transfer these skin weights to the muscle shells below, never paint each
+    # overlaid surface independently at a potentially different joint station.
+    ax = abs(reference[:, 0] - CENTER_X)
+    proximal_twist = 1 - smooth(0.40, 0.55, ax)
+    for side in ("L", "R"):
+        fore = names.index("forearm." + side)
+        helper = names.index("forearm_twist." + side)
+        weights[:, helper] = weights[:, fore] * proximal_twist
+        weights[:, fore] -= weights[:, helper]
     bvh = BVHTree.FromPolygons(surface, tri, all_triangles=True)
     for ob, a, b in cache["slices"]:
         # The broad abdominal sheets need a coherent lumbar field through
         # their thickness. Nearest skin samples can jump along their raised
         # rims and create local stretching even when the skin blend is smooth.
-        if ob == skin or region_name(ob) in (
-            "Head",
-            "Rectus_abdominis",
-            "External_oblique",
+        if (
+            ob == skin
+            or region_name(ob)
+            in (
+                "Head",
+                "Rectus_abdominis",
+                "External_oblique",
+            )
+            or a == b
         ):
             continue
-        for i in range(a, b):
-            co, _, face, _ = bvh.find_nearest(reference[i])
-            ids = tri[face]
-            pa, pb, pc = surface[ids]
-            u = pb - pa
-            v = pc - pa
-            r = np.asarray(co) - pa
-            uu = u @ u
-            uv = u @ v
-            vv = v @ v
-            den = uu * vv - uv * uv
-            if den < 1e-20:
-                bc = np.array([1.0, 0.0, 0.0])
-            else:
-                s = (r @ u * vv - r @ v * uv) / den
-                t = (r @ v * uu - r @ u * uv) / den
-                bc = np.maximum([1 - s - t, s, t], 0.0)
-                bc /= bc.sum()
-            weights[i] = bc @ weights[start + ids]
+        nearest = [bvh.find_nearest(point) for point in reference[a:b]]
+        ids = tri[[hit[2] for hit in nearest]]
+        hits = np.array([tuple(hit[0]) for hit in nearest], dtype=np.float64)
+        bc = _barycentric(hits, surface[ids])
+        weights[a:b] = np.einsum("ij,ijk->ik", bc, weights[start + ids])
     # Gluteal muscles originate on the pelvis/sacrum, not the lumbar spine.
     # Keep their hip/thigh blend, but remove torso influence transferred from
     # nearby lower-back skin at their thin upper rims.
@@ -333,7 +369,18 @@ def bind_weights(cache, reference, names, bones):
     # wall. Fair that transferred field along its own edges before binding;
     # this reduces sharp weight steps without a live modifier or pose handler.
     for ob, a, b in cache["slices"]:
-        if region_name(ob) not in ("Gluteus_maximus", "Medial_hamstring_group"):
+        if region_name(ob) not in (
+            "Gluteus_maximus",
+            "Medial_hamstring_group",
+            "Deltoid",
+            "Biceps_brachii",
+            "Triceps_brachii",
+            "Pectoralis_major",
+            "Latissimus_dorsi",
+            "Forearm_flexor_group",
+            "Forearm_extensor_group",
+            "Brachioradialis",
+        ):
             continue
         edge = np.array([e.vertices[:] for e in ob.data.edges], dtype=np.int32)
         if not len(edge):
@@ -397,27 +444,41 @@ def generate(context, root, cache, reference):
         current[skin_start:skin_end], triangles, all_triangles=True
     )
     data = bpy.data.armatures.new("Base Modeler Simple Rig")
-    rig = bpy.data.objects.new("Base Modeler Simple Rig", data)
-    root.users_collection[0].objects.link(rig)
-    rig.parent = root
-    rig[TAG] = 1
-    rig["base_modeler_binding_schema"] = BINDING_SCHEMA
-    rig["base_modeler_group_names"] = json.dumps(names)
-    rig.show_in_front = True
-    # A long octahedron is much wider than a narrow wrist even when its axis
-    # is correctly fitted. Slender boxes show the actual shaft without hiding
-    # bones or changing the deformation skeleton.
-    data.display_type = "BBONE"
-    data.pose_position = "POSE"
+    rig = None
     try:
+        rig = bpy.data.objects.new("Base Modeler Simple Rig", data)
+        collection = (
+            root.users_collection[0]
+            if root.users_collection
+            else context.scene.collection
+        )
+        collection.objects.link(rig)
+        rig.parent = root
+        rig[TAG] = 1
+        rig["base_modeler_binding_schema"] = BINDING_SCHEMA
+        rig["base_modeler_group_names"] = json.dumps(names)
+        rig.show_in_front = True
+        # A long octahedron is much wider than a narrow wrist even when its axis
+        # is correctly fitted. Slender boxes show the actual shaft without hiding
+        # bones or changing the deformation skeleton.
+        data.display_type = "BBONE"
+        data.pose_position = "POSE"
         bpy.ops.object.select_all(action="DESELECT")
         rig.select_set(True)
         context.view_layer.objects.active = rig
         bpy.ops.object.mode_set(mode="EDIT")
         collections = {
             name: data.collections.new(name)
-            for name in ("Body", "Left Hand", "Right Hand", "Left Foot", "Right Foot")
+            for name in (
+                "Body",
+                "Left Hand",
+                "Right Hand",
+                "Left Foot",
+                "Right Foot",
+                "Deformation",
+            )
         }
+        collections["Deformation"].is_visible = False
         for name, head, tail, parent, deform in bones:
             bone = data.edit_bones.new(name)
             bone.head = head
@@ -445,10 +506,13 @@ def generate(context, root, cache, reference):
                 else "Body"
             )
             collections[category].assign(bone)
+            if name.startswith("forearm_twist."):
+                collections[category].unassign(bone)
+                collections["Deformation"].assign(bone)
             if parent:
                 bone.parent = data.edit_bones[parent]
-            # Disconnected parenting allows both G and R in Pose Mode. Child
-            # joints still coincide at rest and inherit their parent's motion.
+            # Keep the existing rest offsets; local translation constraints
+            # prevent joints separating while root/core can carry the body.
             bone.use_connect = False
             axis = (
                 Vector((0, 0, -1))
@@ -470,7 +534,23 @@ def generate(context, root, cache, reference):
                 )
             )
             bone.align_roll(axis)
+            if name.startswith(("forearm.", "forearm_twist.")):
+                bone.align_roll(Vector((0, -1, 0)))
         bpy.ops.object.mode_set(mode="OBJECT")
+        install_limits(rig)
+        for side in ("L", "R"):
+            helper = rig.pose.bones["forearm_twist." + side]
+            counter = helper.constraints.new("COPY_ROTATION")
+            counter.name = "Distributed forearm twist"
+            counter.target = rig
+            counter.subtarget = "forearm." + side
+            counter.owner_space = counter.target_space = "LOCAL"
+            counter.use_x = counter.use_z = False
+            counter.use_y = True
+            counter.invert_y = True
+            counter.mix_mode = "AFTER"
+            counter.euler_order = "YZX"
+            counter.influence = 0.75
         # A Mixamo-style central control carries the torso and shares its
         # motion with the hips. Independent spine/pelvis edits remain available.
         pelvis = rig.pose.bones["pelvis"]
@@ -494,7 +574,11 @@ def generate(context, root, cache, reference):
         data.bones["core"].bbone_x = 0.014
         data.bones["core"].bbone_z = 0.014
         for pb in rig.pose.bones:
-            pb.rotation_mode = "XYZ"
+            # Twist about the bent forearm's longitudinal axis, without an
+            # Euler singularity at a normal 90-degree elbow bend.
+            pb.rotation_mode = (
+                "YZX" if pb.name.startswith(("forearm.", "forearm_twist.")) else "XYZ"
+            )
             pb.bone.color.palette = (
                 "THEME04"
                 if pb.name.endswith(".L")
@@ -527,7 +611,14 @@ def generate(context, root, cache, reference):
     except Exception:
         if context.object and context.object.mode != "OBJECT":
             bpy.ops.object.mode_set(mode="OBJECT")
-        remove(context, root)
+        if rig is not None and rig_for(root) == rig:
+            remove(context, root)
+        else:
+            # Failed before the rig was tagged: discard only what was created.
+            if rig is not None:
+                bpy.data.objects.remove(rig, do_unlink=True)
+            if data.users == 0:
+                bpy.data.armatures.remove(data)
         raise
 
 
@@ -557,5 +648,6 @@ def remove(context, root):
     bpy.data.objects.remove(rig, do_unlink=True)
     if data.users == 0:
         bpy.data.armatures.remove(data)
-    root.select_set(True)
-    context.view_layer.objects.active = root
+    if context.view_layer.objects.get(root.name) == root:
+        root.select_set(True)
+        context.view_layer.objects.active = root

@@ -27,8 +27,10 @@ def model_for(context):
 
 def cache_for(root):
     objects = meshes_for(root)
-    if tuple(region_name(ob) for ob in objects) != REGIONS:
-        raise ValueError("A model region is missing. Create a new base model.")
+    found = tuple(region_name(ob) for ob in objects)
+    if found != REGIONS:
+        problem = "missing" if set(REGIONS) - set(found) else "duplicated or unknown"
+        raise ValueError(f"A model region is {problem}. Create a new base model.")
     signature = tuple(
         (
             o.as_pointer(),
@@ -250,6 +252,13 @@ BM_Settings.__annotations__ = {
     )
     for c in CONTROLS
 }
+
+
+def forget(root):
+    """Drop one model's evaluation cache and error, leaving other models intact."""
+    key = root.as_pointer()
+    _CACHE.pop(key, None)
+    _ERRORS.pop(key, None)
 
 
 @persistent

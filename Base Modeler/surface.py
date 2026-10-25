@@ -1,5 +1,7 @@
 """Repair imported shading data when upgrading an existing Base Modeler body."""
 
+from .constants import REST
+
 
 def match_skin_tone(objects):
     head = next(
@@ -90,7 +92,7 @@ def prepare_surfaces(objects):
                     and link.from_socket.name == "Position"
                 ]
             anchor = tree.nodes.new("ShaderNodeAttribute")
-            anchor.attribute_name = "base_modeler_rest"
+            anchor.attribute_name = REST
             anchor.label = "Source coordinates: stable during body edits"
             for link in links:
                 target = link.to_socket

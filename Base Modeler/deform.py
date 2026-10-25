@@ -10,17 +10,13 @@ import numpy as np
 from .controls import CONTROLS
 from functools import lru_cache
 from . import native
-from .pose import arm_weights, compile_arm_fields, independent_arms
+from .pose import CENTER_X, smooth, arm_weights, compile_arm_fields, independent_arms
 from .sculpt import corrected_reference
 from .contact import bindings, fit_outer_surfaces
 
-CENTER_X = -0.00455
 FLOOR = -0.009873936884105206
-
-
-def smooth(a, b, x):
-    t = np.clip((x - a) / (b - a), 0.0, 1.0)
-    return t * t * (3.0 - 2.0 * t)
+# Exact anatomical transports applied after the shared flow field.
+_TRANSPORTED = ("height", "thigh_length", "leg_length", "arm_length")
 
 
 def bell(x, center, radius):
@@ -228,7 +224,7 @@ def evaluate(rest, fields, values, *, use_native=True, normalize_height=True):
         value = min(c.maximum, max(c.minimum, value))
         # Limb lengths are exact anatomical transports, applied after the
         # shared flow. Sampling arm length on a moving grid leaks into hips.
-        if c.id not in ("height", "thigh_length", "leg_length", "arm_length"):
+        if c.id not in _TRANSPORTED:
             amount = value - c.default
             if amount:
                 velocity += fields["velocities"][c.id] * amount

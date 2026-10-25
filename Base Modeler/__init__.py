@@ -74,6 +74,15 @@ _CLASSES = (
 )
 
 
+def _handlers():
+    """Application handlers owned by the extension, shared by (un)registration."""
+    return (
+        (bpy.app.handlers.undo_post, clear_cache),
+        (bpy.app.handlers.redo_post, clear_cache),
+        (bpy.app.handlers.load_post, upgrade_loaded_models),
+    )
+
+
 def register():
     registered = []
     added_hooks = []
@@ -85,11 +94,7 @@ def register():
             registered.append(cls)
         bpy.types.Object.base_modeler = bpy.props.PointerProperty(type=BM_Settings)
         pointer_created = True
-        for hooks, handler in (
-            (bpy.app.handlers.undo_post, clear_cache),
-            (bpy.app.handlers.redo_post, clear_cache),
-            (bpy.app.handlers.load_post, upgrade_loaded_models),
-        ):
+        for hooks, handler in _handlers():
             if handler not in hooks:
                 hooks.append(handler)
                 added_hooks.append((hooks, handler))
@@ -116,15 +121,9 @@ def register():
 def unregister():
     if bpy.app.timers.is_registered(upgrade_loaded_models):
         bpy.app.timers.unregister(upgrade_loaded_models)
-    for hooks in (
-        bpy.app.handlers.load_post,
-        bpy.app.handlers.undo_post,
-        bpy.app.handlers.redo_post,
-    ):
-        if clear_cache in hooks:
-            hooks.remove(clear_cache)
-    if upgrade_loaded_models in bpy.app.handlers.load_post:
-        bpy.app.handlers.load_post.remove(upgrade_loaded_models)
+    for hooks, handler in _handlers():
+        if handler in hooks:
+            hooks.remove(handler)
     clear_cache()
     if hasattr(bpy.types.Object, "base_modeler"):
         del bpy.types.Object.base_modeler

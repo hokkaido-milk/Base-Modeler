@@ -39,18 +39,23 @@ def _analytic_arm_weights(points):
 
 @lru_cache(maxsize=1)
 def _partition():
-    with np.load(Path(__file__).parent / "assets" / "arm_partition.npz") as data:
-        return {key: data[key] for key in ("rest", "grid")}
+    path = Path(__file__).parent / "assets" / "arm_partition.npz"
+    if not path.exists():
+        return ()
+    with np.load(path) as data:
+        arrays = tuple(data[key] for key in ("rest", "grid"))
+    # Callers share these cached arrays; never let one of them edit in place.
+    for array in arrays:
+        array.flags.writeable = False
+    return arrays
 
 
 def arm_weights(points):
     # Closed muscle volumes have explicit ownership; the connected base skin
     # uses a harmonic attachment compiled along its topology.
-    path = Path(__file__).parent / "assets" / "arm_partition.npz"
-    if path.exists():
-        for value in _partition().values():
-            if len(value) == len(points):
-                return value
+    for value in _partition():
+        if len(value) == len(points):
+            return value
     return _analytic_arm_weights(points)
 
 

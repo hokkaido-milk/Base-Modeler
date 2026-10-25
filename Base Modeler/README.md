@@ -1,7 +1,7 @@
 # Base Modeler
 
 Shape an adult anime body with 27 continuous controls, then generate a native
-81-bone FK rig for posing. The foundation, anatomy corrections and face texture
+83-bone FK rig (81 controls plus two hidden twist bones) for posing. The foundation, anatomy corrections and face texture
 are bundled. No external generator, Rigify or network access is required.
 
 ## Install
@@ -21,7 +21,7 @@ from Disk**, select the ZIP and enable **Base Modeler**.
 3. Select the model root or any body part and adjust **Controls** in Object Mode.
 4. Use the arrow beside a slider or region to reset it, or choose **Reset All Body Controls**.
 5. Choose **Generate Simple Rig**, select a bone in Pose Mode, then **R** to rotate
-   or **G** to translate. Use **Remove Simple Rig** to return to body editing.
+   within joint limits. Use **G** on `root` or `core` to translate the body. Use **Remove Simple Rig** to return to body editing.
 
 Save the `.blend` file to retain shape settings. A generated rig uses native
 Blender bones and modifiers and remains poseable without the plugin installed.
@@ -29,7 +29,11 @@ Each hand has three bones per finger (including the thumb metacarpal). Each foot
 has two bones in the big toe and three in each other toe. The `toe.L` / `toe.R`
 bones move the whole toe bank. Bone collections separate the body, hands and
 feet. Slender bone displays are sized to fit the skin, and nails follow their
-distal phalanges as rigid plates. The rig uses direct FK posing without IK.
+distal phalanges as rigid plates. The rig uses direct FK posing without IK. Joint translation and bone scaling are
+locked; rotation limits prevent gross over-bending. The hidden forearm twist
+bones distribute rotation from the elbow toward the wrist.
+Elbows flex forward with positive local X; local Y turns the forearm.
+The wrist twist channel is locked because pronation/supination belongs to the forearm.
 Positive local X rotation curls the digit bones toward the palm or sole.
 The `core` control carries the torso and shares 35% of its rotation with the
 hips; translation carries the whole body. Use `spine` and `chest` for additional
@@ -76,6 +80,17 @@ The buttocks use a rounded rear volume and softer lower corners; Size grows all
 three dimensions together. The neutral neck is slightly shorter and the chin
 has a broader, softer tip.
 
+The anatomy surface pass reduces excessive relief in the shoulders, neck,
+upper back, arms and anterior legs. Abdominal segments sit closer together;
+the lower abdomen tapers toward the pubis and has a shallow midline groove.
+The original vertex order, UVs and body attachment seams are retained.
+New rigs fit and bind to this corrected neutral surface. Existing saved rigs
+keep their original geometry and weights until removed and regenerated.
+
+This remains a stylized female surface-anatomy drawing aid, not a complete
+medical ecorche: the breast surface covers underlying pectoral anatomy and
+several deeper muscles and tendons are not individually modeled.
+
 Thigh and lower-leg length edits carry the torso without resizing it and update
 measured Height. At the height limits, further length changes stop at the bound.
 Explicit Height edits scale the complete body. Sag sculpts the rest shape; it is
@@ -88,3 +103,5 @@ Materials and the packed face texture are retained. Material Preview gives a
 lit view; viewport shading remains under your control.
 
 See `NOTICES.md` for asset provenance and licensing, and `LICENSE` for the code license.
+
+See `../docs/WEIGHT_REVIEW.md` for joint ranges, binding changes and validation.

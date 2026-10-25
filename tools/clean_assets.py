@@ -36,7 +36,7 @@ bpy.data.libraries.write(
 metadata = {
     "name": "Base Modeler foundation",
     "default_pose": "T",
-    "meshes": 29,
+    "meshes": len(bm.meshes_for(root)),
     "vertices": sum(len(ob.data.vertices) for ob in bm.meshes_for(root)),
     "regions": [region_name(ob) for ob in bm.meshes_for(root)],
     "asset_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -46,6 +46,7 @@ required = {
     "arm_partition.npz": ("rest", "grid"),
     "axilla_sculpt.npz": ("vertex_count", "indices", "source_offset"),
     "neck_sculpt.npz": ("vertex_count", "indices", "source_offset"),
+    "anatomy_sculpt.npz": ("vertex_count", "indices", "source_offset"),
     "surface_contacts.npz": (
         "indices",
         "triangles",

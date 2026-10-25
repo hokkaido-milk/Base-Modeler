@@ -67,26 +67,27 @@ def round_buttocks(points):
     return result
 
 
-@lru_cache(maxsize=1)
-def _asset():
-    with np.load(Path(__file__).parent / "assets" / "axilla_sculpt.npz") as data:
+@lru_cache(maxsize=None)
+def _offsets(asset):
+    with np.load(Path(__file__).parent / "assets" / asset) as data:
         return int(data["vertex_count"]), data["indices"], data["source_offset"]
 
 
-@lru_cache(maxsize=1)
-def _neck_asset():
-    with np.load(Path(__file__).parent / "assets" / "neck_sculpt.npz") as data:
-        return int(data["vertex_count"]), data["indices"], data["source_offset"]
+def _apply_offsets(result, asset, label):
+    """Add a compiled per-vertex sculpt, rejecting a foundation it was not made for."""
+    count, indices, offset = _offsets(asset)
+    if len(result) != count:
+        raise ValueError(f"The {label} sculpt does not match this foundation.")
+    result[indices] += offset
+    return result
+
+
+def foundation_reference(rest):
+    result = np.array(rest, dtype=np.float32, copy=True)
+    _apply_offsets(result, "axilla_sculpt.npz", "shoulder")
+    _apply_offsets(result, "neck_sculpt.npz", "neck")
+    return refine_neck_chin(round_buttocks(round_breasts(result)))
 
 
 def corrected_reference(rest):
-    count, indices, offset = _asset()
-    if len(rest) != count:
-        raise ValueError("The shoulder sculpt does not match this foundation.")
-    result = np.array(rest, dtype=np.float32, copy=True)
-    result[indices] += offset
-    count, indices, offset = _neck_asset()
-    if len(rest) != count:
-        raise ValueError("The neck sculpt does not match this foundation.")
-    result[indices] += offset
-    return refine_neck_chin(round_buttocks(round_breasts(result)))
+    return _apply_offsets(foundation_reference(rest), "anatomy_sculpt.npz", "anatomy")

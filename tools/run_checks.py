@@ -76,6 +76,10 @@ with tempfile.TemporaryDirectory(prefix="base_modeler_checks_") as tmp:
             raise SystemExit("Check failed: " + name)
 
     run("assets", "test_assets.py", load=False)
+    run("anatomy_surface", "test_anatomy_surface.py")
+    run("limits", "test_limits.py")
+    run("limits_reopen", "test_limits_reopen.py", OUT / "Limited_Rig.blend", load=False)
+    run("weight_quality", "test_weight_quality.py")
     run("shapes", "test_shapes.py")
     run("controls", "test_controls.py")
     run("runtime", "test_runtime.py")

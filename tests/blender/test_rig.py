@@ -3,6 +3,9 @@
 import bpy
 import sys
 import numpy as np
+
+# Native constraint matrix round-trips introduce up to ~1.5 micrometres
+# of float32 rest-pose error; bound absolute mesh checks to 3 micrometres.
 import time
 import json
 from pathlib import Path
@@ -44,11 +47,13 @@ assert bpy.ops.base_modeler.generate_rig() == {"FINISHED"}
 elapsed = time.perf_counter() - start
 rig = rig_for(root)
 assert bpy.context.mode == "POSE" and bpy.context.object == rig
-assert len(rig.data.bones) == 81
-assert len(rig.pose.bones["pelvis"].constraints) == 2
-assert all(not pb.constraints for pb in rig.pose.bones if pb.name != "pelvis")
+assert len(rig.data.bones) == 83
+assert len(rig.pose.bones["pelvis"].constraints) == 5
+assert all(
+    any(c.type == "LIMIT_SCALE" for c in pb.constraints) for pb in rig.pose.bones
+)
 neutral_wrist_x = rig.data.bones["hand.L"].head_local.x
-assert np.max(abs(evaluated() - neutral)) < 1e-6
+assert np.max(abs(evaluated() - neutral)) < 3e-6
 assert not bpy.ops.base_modeler.generate_rig.poll()
 for ob, a, b in c["slices"]:
     assert len(ob.modifiers) == 1 and ob.modifiers[0].object == rig
@@ -94,7 +99,7 @@ for name, rot, minimum in [
     ("forearm.L", (0.9, 0, 0), 0.08),
     ("upper_arm.R", (-0.7, 0, 0), 0.20),
     ("thigh.L", (0.65, 0, 0), 0.20),
-    ("shin.R", (1.0, 0, 0), 0.15),
+    ("shin.R", (-1.0, 0, 0), 0.15),
     ("foot.L", (0.45, 0, 0), 0.015),
     ("toe.R", (0.5, 0, 0), 0.008),
     ("head", (0, 0.4, 0), 0.02),
@@ -111,20 +116,20 @@ for name, rot, minimum in [
     checks.append({"bone": name, "maximum_displacement_m": float(distance.max())})
 q = pose("root", location=(0.1, 0.05, 0.03))
 movement = np.array(rig.pose.bones["root"].head - rig.data.bones["root"].head_local)
-assert np.max(abs(q - neutral - movement)) < 1e-6
+assert np.max(abs(q - neutral - movement)) < 3e-6
 q = pose("hand.L", location=(0, 0.035, 0))
-assert np.max(abs(q - neutral)) > 0.02
+assert np.max(abs(q - neutral)) < 3e-6, "Locked wrist translated"
 reset()
-assert np.max(abs(evaluated() - neutral)) < 1e-6
+assert np.max(abs(evaluated() - neutral)) < 3e-6
 rig.pose.bones["upper_arm.L"].rotation_euler.x = -0.65
-rig.pose.bones["forearm.L"].rotation_euler.x = -0.70
+rig.pose.bones["forearm.L"].rotation_euler.x = 0.70
 rig.pose.bones["upper_arm.R"].rotation_euler.x = -0.50
 rig.pose.bones["thigh.L"].rotation_euler.x = 0.25
 posed = evaluated()
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT / "Posed_Rig.blend"))
 # Removing an armature returns the exact modeled shape and restores sliders.
 assert bpy.ops.base_modeler.remove_rig() == {"FINISHED"}
-assert rig_for(root) is None and np.max(abs(evaluated() - neutral)) < 1e-6
+assert rig_for(root) is None and np.max(abs(evaluated() - neutral)) < 3e-6
 assert all(
     not ob.modifiers and set(ob.vertex_groups.keys()) == original_groups[ob.name]
     for ob, _, _ in c["slices"]
@@ -137,12 +142,12 @@ assert not bm._ERRORS
 custom = evaluated()
 assert bpy.ops.base_modeler.generate_rig() == {"FINISHED"}
 rig = rig_for(root)
-assert np.max(abs(evaluated() - custom)) < 1e-6
+assert np.max(abs(evaluated() - custom)) < 3e-6
 assert rig.data.bones["head"].tail_local.z > 1.8
 assert rig.data.bones["hand.L"].head_local.x > neutral_wrist_x + 0.05
 assert bpy.ops.base_modeler.remove_rig() == {"FINISHED"}
 assert bpy.ops.base_modeler.reset() == {"FINISHED"}
-assert np.max(abs(evaluated() - neutral)) < 1e-6
+assert np.max(abs(evaluated() - neutral)) < 3e-6
 assert bpy.ops.base_modeler.generate_rig() == {"FINISHED"}
 rig = rig_for(root)
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT / "Native_Rig.blend"))

@@ -13,6 +13,7 @@ from .model import (
     refresh_geometry,
     update_model,
     clear_cache,
+    forget,
     _ERRORS,
     _GUARD,
 )
@@ -41,7 +42,9 @@ class BM_OT_create(bpy.types.Operator):
             with bpy.data.libraries.load(str(path), link=False) as (source, target):
                 target.objects = list(source.objects)
             loaded = [o for o in target.objects if o]
-            root = next(o for o in loaded if o.get("base_modeler_model") == 1)
+            root = next((o for o in loaded if o.get("base_modeler_model") == 1), None)
+            if root is None:
+                raise ValueError("The bundled foundation has no model root.")
             collection = bpy.data.collections.new("Base Modeler")
             context.scene.collection.children.link(collection)
             for ob in loaded:
@@ -59,7 +62,7 @@ class BM_OT_create(bpy.types.Operator):
             bpy.ops.object.select_all(action="DESELECT")
             root.select_set(True)
             context.view_layer.objects.active = root
-            self.report({"INFO"}, "Base Modeler: 27 body controls ready")
+            self.report({"INFO"}, f"Base Modeler: {len(CONTROLS)} body controls ready")
             return {"FINISHED"}
         except Exception as exc:
             library.rollback(before)
@@ -87,18 +90,14 @@ class BM_OT_reset(bpy.types.Operator):
     def execute(self, context):
         root = model_for(context)
         key = root.as_pointer()
-        if (
-            self.group
-            and self.group not in GROUPS
-            or self.field
-            and self.field not in BY_ID
-        ):
+        group, field = self.group, self.field
+        if (group and group not in GROUPS) or (field and field not in BY_ID):
             self.report({"ERROR"}, "Unknown body control or region.")
             return {"CANCELLED"}
-        if self.group and self.field and BY_ID[self.field].group != self.group:
+        if group and field and BY_ID[field].group != group:
             self.report({"ERROR"}, "The control does not belong to that region.")
             return {"CANCELLED"}
-        if not self.group and not self.field:
+        if not group and not field:
             try:
                 refresh_geometry(cache_for(root))
             except (ValueError, RuntimeError, ReferenceError) as exc:
@@ -108,22 +107,14 @@ class BM_OT_reset(bpy.types.Operator):
         _GUARD.add(key)
         try:
             for c in CONTROLS:
-                if (not self.group or c.group == self.group) and (
-                    not self.field or c.id == self.field
-                ):
+                if (not group or c.group == group) and (not field or c.id == field):
                     setattr(root.base_modeler, c.id, c.default)
         finally:
             _GUARD.discard(key)
-        update_model(
-            root.base_modeler,
-            context,
-            preserve_length_scale=bool(
-                self.field
-                and self.field != "height"
-                or self.group
-                and self.group != "Global"
-            ),
-        )
+        # Local length resets keep the torso scale and update measured height;
+        # resets that include Height restore the complete body.
+        preserve = (field and field != "height") or (group and group != "Global")
+        update_model(root.base_modeler, context, preserve_length_scale=bool(preserve))
         if key in _ERRORS:
             self.report({"ERROR"}, _ERRORS[key])
             return {"CANCELLED"}
@@ -152,7 +143,7 @@ class BM_OT_generate_rig(bpy.types.Operator):
             self.report(
                 {"INFO"},
                 str(len(rig.data.bones))
-                + " bones ready: select a bone, then G to move or R to rotate",
+                + " bones ready: R to pose within limits; G on root/core to move",
             )
             return {"FINISHED"}
         except (ValueError, RuntimeError) as exc:
@@ -163,9 +154,7 @@ class BM_OT_generate_rig(bpy.types.Operator):
 class BM_OT_pose_rig(bpy.types.Operator):
     bl_idname = "base_modeler.pose_rig"
     bl_label = "Pose Simple Rig"
-    bl_description = (
-        "Select the skeleton and enter Pose Mode; move or rotate its bones directly"
-    )
+    bl_description = "Enter Pose Mode: rotate joints; move the body with root or core"
 
     @classmethod
     def poll(cls, context):
@@ -207,7 +196,7 @@ class BM_OT_remove_rig(bpy.types.Operator):
     def execute(self, context):
         root = model_for(context)
         remove_rig(context, root)
-        clear_cache()
+        forget(root)
         update_model(root.base_modeler, context)
         if root.as_pointer() in _ERRORS:
             self.report({"WARNING"}, _ERRORS[root.as_pointer()])

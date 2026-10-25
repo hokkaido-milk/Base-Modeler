@@ -60,6 +60,15 @@ indices; regenerate them when replacing source geometry. Internal data-schema
 identifiers support saved-model compatibility and are independent of the public
 release version.
 
+`tools/refine_anatomy.py` rebuilds `assets/anatomy_sculpt.npz` from immutable
+rest coordinates plus the earlier foundation corrections. Run it through
+Blender after `tools/load_plugin.py`. It deliberately bypasses its own output,
+so rebuilding never accumulates sculpt offsets. The pass preserves topology
+and operates before controls, contact fitting and rig weight generation.
+Run `test_anatomy_surface.py` and the full suite after rebuilding; then refresh
+the foundation and editable example using the commands above. See
+`docs/ANATOMY_REVIEW.md` for the artistic scope and reference sources.
+
 ## Preview installed package
 
 ```sh

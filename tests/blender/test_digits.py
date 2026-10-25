@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 import bpy
 import numpy as np
+
+# Native constraint matrix round-trips introduce up to ~1.5 micrometres
+# of float32 rest-pose error; bound absolute mesh checks to 3 micrometres.
 import base_modeler as bm
 from base_modeler.digits import chains
 from base_modeler.identity import region_name
@@ -16,9 +19,10 @@ cache = bm.cache_for(root)
 neutral = cache["last_result"].copy()
 assert bpy.ops.base_modeler.generate_rig() == {"FINISHED"}
 rig = bm.rig_for(root)
-assert len(rig.data.bones) == 81
+assert len(rig.data.bones) == 83
 assert rig.data.display_type == "BBONE"
-assert len(rig.data.collections) == 5
+assert len(rig.data.collections) == 6
+assert not rig.data.collections["Deformation"].is_visible
 
 
 def evaluated():
@@ -88,7 +92,7 @@ for side in ("L", "R"):
             )
             for terminal, ids in nail_ids.items():
                 if terminal != names[-1]:
-                    assert np.max(abs(result[ids] - neutral[ids])) < 1e-6, (
+                    assert np.max(abs(result[ids] - neutral[ids])) < 3e-6, (
                         name,
                         "neighbour nail moved",
                         terminal,
@@ -141,7 +145,7 @@ assert ratio.min() > 0.0001, ("combined curl degenerate face", float(ratio.min()
 assert compressed_area < 1e-5, ("combined curl widespread pinching", compressed_area)
 assert np.max(abs(result[a] - result[b])) < 2e-6
 reset()
-assert np.max(abs(evaluated() - neutral)) < 1e-6
+assert np.max(abs(evaluated() - neutral)) < 3e-6
 report = {
     "individual_joint_bends": len(checks),
     "checks": checks,
