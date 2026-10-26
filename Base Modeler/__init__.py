@@ -24,6 +24,9 @@ from .operators import (
     BM_OT_generate_rig,
     BM_OT_pose_rig,
     BM_OT_remove_rig,
+    BM_OT_target_controls,
+    BM_OT_target_mode,
+    BM_OT_select_target,
 )
 from .ui import BM_PT_actions, BM_PT_body
 
@@ -69,6 +72,9 @@ _CLASSES = (
     BM_OT_generate_rig,
     BM_OT_pose_rig,
     BM_OT_remove_rig,
+    BM_OT_target_controls,
+    BM_OT_target_mode,
+    BM_OT_select_target,
     BM_PT_actions,
     BM_PT_body,
 )

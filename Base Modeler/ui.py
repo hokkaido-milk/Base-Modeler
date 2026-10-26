@@ -33,7 +33,33 @@ class BM_PT_actions(bpy.types.Panel):
             )
             layout.label(text="Remove rig to edit body proportions.")
             schema = rig.get("base_modeler_binding_schema", 1)
-            if schema >= LIMITS_SCHEMA:
+            if rig.get("base_modeler_target_controls"):
+                layout.label(text="Balls: G to move, R to orient.")
+                for ch, label in (
+                    ("head", "Head"),
+                    ("hand.L", "Left hand"),
+                    ("hand.R", "Right hand"),
+                    ("foot.L", "Left foot"),
+                    ("foot.R", "Right foot"),
+                ):
+                    row = layout.row(align=True)
+                    select = row.operator(
+                        "base_modeler.select_target",
+                        text=label,
+                        icon="RESTRICT_SELECT_OFF",
+                    )
+                    select.channel = ch
+                    active = bool(rig.get("target_" + ch))
+                    toggle = row.operator(
+                        "base_modeler.target_mode",
+                        text=("Look" if ch == "head" else "IK") if active else "FK",
+                        depress=active,
+                    )
+                    toggle.channel = ch
+                layout.label(text="Head ball: move to aim the gaze.")
+            else:
+                layout.operator("base_modeler.target_controls", icon="SPHERE")
+            if schema >= LIMITS_SCHEMA and not rig.get("base_modeler_target_controls"):
                 layout.label(text="R: pose joints within limits.")
                 layout.label(text="G: move root or core only.")
             if schema < BINDING_SCHEMA:

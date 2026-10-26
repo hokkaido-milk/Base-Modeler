@@ -176,6 +176,88 @@ class BM_OT_pose_rig(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class BM_OT_target_controls(bpy.types.Operator):
+    bl_idname = "base_modeler.target_controls"
+    bl_label = "Add Pose Targets"
+    bl_description = (
+        "Add movable hand and foot balls and a head gaze target to this rig"
+    )
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        root = model_for(context)
+        return (
+            context.mode in ("OBJECT", "POSE")
+            and root is not None
+            and rig_for(root) is not None
+        )
+
+    def execute(self, context):
+        from .targets import install
+
+        try:
+            install(context, rig_for(model_for(context)))
+        except (ValueError, RuntimeError) as error:
+            self.report({"ERROR"}, str(error))
+            return {"CANCELLED"}
+        return {"FINISHED"}
+
+
+class BM_OT_target_mode(bpy.types.Operator):
+    bl_idname = "base_modeler.target_mode"
+    bl_label = "Switch Target / FK"
+    bl_description = (
+        "Snap the target or joint controls to the current pose and switch modes"
+    )
+    bl_options = {"REGISTER", "UNDO"}
+    channel: bpy.props.EnumProperty(
+        items=[(n, n, "") for n in ("hand.L", "hand.R", "foot.L", "foot.R", "head")]
+    )
+
+    @classmethod
+    def poll(cls, context):
+        root = model_for(context)
+        rig = rig_for(root) if root else None
+        return (
+            context.mode in ("OBJECT", "POSE")
+            and rig is not None
+            and bool(rig.get("base_modeler_target_controls"))
+        )
+
+    def execute(self, context):
+        from .targets import set_mode
+
+        rig = rig_for(model_for(context))
+        set_mode(context, rig, self.channel, not rig["target_" + self.channel])
+        return {"FINISHED"}
+
+
+class BM_OT_select_target(bpy.types.Operator):
+    bl_idname = "base_modeler.select_target"
+    bl_label = "Select Pose Control"
+    bl_description = "Select this target ball, or its joint when using FK"
+    bl_options = {"UNDO"}
+    channel: bpy.props.StringProperty()
+
+    @classmethod
+    def poll(cls, context):
+        return BM_OT_target_mode.poll(context)
+
+    def execute(self, context):
+        rig = rig_for(model_for(context))
+        bpy.ops.base_modeler.pose_rig()
+        name = ("target_" if rig.get("target_" + self.channel) else "") + self.channel
+        for pb in rig.pose.bones:
+            pb.select = False
+        rig.data.bones[name].hide = False
+        if hasattr(rig.pose.bones[name], "hide"):
+            rig.pose.bones[name].hide = False
+        rig.pose.bones[name].select = True
+        rig.data.bones.active = rig.data.bones[name]
+        return {"FINISHED"}
+
+
 class BM_OT_remove_rig(bpy.types.Operator):
     bl_idname = "base_modeler.remove_rig"
     bl_label = "Remove Simple Rig"

@@ -720,6 +720,9 @@ def remove(context, root):
             if group:
                 ob.vertex_groups.remove(group)
     data = rig.data
+    from .targets import cleanup
+
+    cleanup(rig)
     bpy.data.objects.remove(rig, do_unlink=True)
     if data.users == 0:
         bpy.data.armatures.remove(data)

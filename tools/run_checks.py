@@ -79,6 +79,10 @@ with tempfile.TemporaryDirectory(prefix="base_modeler_checks_") as tmp:
     run("anatomy_surface", "test_anatomy_surface.py")
     run("limits", "test_limits.py")
     run("limits_reopen", "test_limits_reopen.py", OUT / "Limited_Rig.blend", load=False)
+    run("targets", "test_targets.py")
+    run(
+        "targets_reopen", "test_targets_reopen.py", OUT / "Target_Rig.blend", load=False
+    )
     run("weight_quality", "test_weight_quality.py")
     run("shapes", "test_shapes.py")
     run("controls", "test_controls.py")
