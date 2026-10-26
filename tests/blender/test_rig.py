@@ -56,7 +56,10 @@ neutral_wrist_x = rig.data.bones["hand.L"].head_local.x
 assert np.max(abs(evaluated() - neutral)) < 3e-6
 assert not bpy.ops.base_modeler.generate_rig.poll()
 for ob, a, b in c["slices"]:
-    assert len(ob.modifiers) == 1 and ob.modifiers[0].object == rig
+    # Dual-quaternion binding, plus a linear-skinning blend near the hips.
+    assert 1 <= len(ob.modifiers) <= 2
+    assert all(m.type == "ARMATURE" and m.object == rig for m in ob.modifiers)
+    assert all(m.use_multi_modifier for m in ob.modifiers[1:])
     owned = {g.index for g in ob.vertex_groups if g.name in rig.data.bones}
     totals = np.array(
         [sum(g.weight for g in v.groups if g.group in owned) for v in ob.data.vertices]

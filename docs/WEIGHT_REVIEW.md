@@ -18,13 +18,13 @@ measurements. The arms start in a T-pose, not hanging at the sides.
 
 | Control | Flexion/extension (X) | Axial twist (Y) | Lateral motion (Z) |
 | --- | --- | --- | --- |
-| Core | -25 to 40 | ±20 | ±20 |
+| Core | -30 to 90 | ±30 | ±30 |
 | Pelvis adjustment | -25 to 30 | ±25 | ±20 |
-| Spine | -20 to 35 | ±20 | ±25 |
-| Chest | -15 to 25 | ±25 | ±20 |
+| Spine | -30 to 60 | ±30 | ±35 |
+| Chest | -20 to 40 | ±35 | ±25 |
 | Neck | -35 to 40 | ±55 | ±30 |
 | Head | -20 to 25 | ±25 | ±15 |
-| Shoulder girdle | -15 to 25 | ±15 | ±20 |
+| Shoulder girdle | -10 to 40 (shrug) | ±15 | ±25 |
 | Upper arm | -100 to 90 (lower/raise from T) | ±85 | -100 to 50, mirrored |
 | Elbow / forearm | -5 to 150 | ±90 | Locked |
 | Wrist | -75 to 80 | Locked | -25 to 35, mirrored |
@@ -33,7 +33,11 @@ measurements. The arms start in a T-pose, not hanging at the sides.
 | Ankle | -50 to 30 | ±15 | ±20 |
 | Toe bank | -15 to 20 | Locked | ±5 |
 
-The pelvis also inherits 35% of core rotation and all core translation. Head and
+Positive X flexes the trunk forward. Spine and chest together reach a
+100-degree forward fold, so a near-90-degree bend is available in the back
+alone; core adds a bend over the hips. The pelvis also inherits 35% of core
+rotation and all core translation, so a large core bend also tilts the legs;
+counter-rotate the thighs to keep the feet planted. Head and
 neck budgets together allow about 80 degrees of axial rotation, rather than a
 180-degree turn at one neck joint. Finger knuckles allow limited spread and
 extension; middle/distal joints are flexion hinges. Thumb and toe limits are
@@ -80,6 +84,51 @@ so it compares equivalent poses despite the changed bone roll. Not every strain
 metric improves: distributing a bend trades some local compression/stretch for
 less extreme concentration elsewhere. Before/after renders and full per-region
 measurements are in `artifacts/weight_refinement/`.
+
+## Thorax, shoulder girdle and hip (binding schema 8)
+
+- The chest pivots at 1.21 m, the thoracolumbar junction below the breasts,
+  instead of mid-breast. Breasts are bound rigidly to the chest, so chest bends
+  rotate them with the ribcage instead of folding them along a weight gradient.
+- Lumbar and thoracic folds are stacked through the short front abdomen (navel
+  down, navel up) and follow the lumbar and lower thoracic spine behind. Each
+  torso transition is centred on its child joint.
+- The neck is a narrow column. Previously it owned the upper chest, both
+  trapezius slopes and half of each deltoid, so head turns dragged the shoulders.
+  Pectoralis major carries no neck influence; trapezius and sternocleidomastoid
+  weights are faired through their own edges.
+- The clavicle and upper trapezius share the shoulder control, so shrugs lift
+  them. The girdle/arm blend is centred on the glenohumeral joint, so lowered
+  arms carry their deltoid cap instead of leaving raised shoulder pads.
+- Dual-quaternion skinning remains for knees, elbows and twisting forearms. A
+  second native Armature modifier (multi-modifier, `base_modeler_linear_skinning`
+  group) fades the posterior pelvis/thigh zone to linear skinning. This removes
+  the dual-quaternion bulge that swung the buttock into a lump below a flexed
+  thigh. The anterior groin crease stays mostly dual-quaternion to limit collapse.
+- The rectus femoris and vastus lateralis tips above the hip pivot keep 65% of
+  the skin's pelvic share. Bound wholly to the femur, they swung back through
+  the gluteus when the thigh flexed.
+
+Edge length ratio, 99th / 1st percentile, previous binding vs schema 8:
+
+| Pose | Region | Previous | Schema 8 |
+| --- | --- | --- | --- |
+| Chest forward 25° | Rectus abdominis | 1.00 / 0.37 | 1.02 / 0.50 |
+| Spine 35° + chest 25° | Skin | 1.02 / 0.85 | 1.01 / 0.93 |
+| Side bend | Serratus anterior | 1.50 / 0.54 | 1.04 / 0.97 |
+| Side bend | External oblique | 1.31 / 0.72 | 1.47 / 0.61 |
+| Torso twist | Serratus anterior | 1.39 / 0.73 | 1.05 / 0.95 |
+| Neck turn 45° | Deltoid | 2.04 / 0.67 | 1.03 / 0.97 |
+| Neck turn 45° | Trapezius | 1.44 / 0.77 | 1.65 / 0.53 |
+| Arm lowered 80° | Deltoid | 2.29 / 0.91 | 1.92 / 0.88 |
+| Arm raised 80° | Pectoralis major | 1.67 / 0.73 | 1.43 / 0.80 |
+| Hip flexed 90° | Gluteus maximus | 1.74 / 0.91 | 1.44 / 0.70 |
+| Hip flexed 90° | Medial hamstrings | 2.13 / 0.83 | 1.74 / 0.79 |
+
+Side-bend and twist strain moves from the serratus/latissimus into the
+obliques, and a head turn now stretches the trapezius at the neck base instead
+of carrying the shoulders. `test_torso_rig.py` gates breast rigidity, deep
+forward folds, neck isolation, deltoid travel, hip strain and thigh-tip travel.
 
 ## Validation and compatibility
 

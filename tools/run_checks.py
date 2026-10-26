@@ -93,6 +93,7 @@ with tempfile.TemporaryDirectory(prefix="base_modeler_checks_") as tmp:
     run("digits", "test_digits.py")
     run("anatomy_rig", "test_anatomy_rig.py")
     run("spine_pose", "test_spine_pose.py")
+    run("torso_rig", "test_torso_rig.py")
     run("poses", "test_poses.py")
     run("rig", "test_rig.py")
     run("rig_reopen", "test_rig_reopen.py", OUT / "rig/Native_Rig.blend", load=False)

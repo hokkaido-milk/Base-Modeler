@@ -37,9 +37,11 @@ The wrist twist channel is locked because pronation/supination belongs to the fo
 Positive local X rotation curls the digit bones toward the palm or sole.
 The `core` control carries the torso and shares 35% of its rotation with the
 hips; translation carries the whole body. Use `spine` and `chest` for additional
-upper-body bends, and `pelvis` for a separate hip adjustment. The spine pivots
-at the waist; its weight blend stays above the pelvic crest so lumbar bends
-preserve the buttock origins and spread motion through the abdomen. Positive local X
+upper-body bends (together up to a 100-degree forward fold), and `pelvis` for a
+separate hip adjustment. The spine pivots at the waist and the chest below the
+breasts, so the ribcage, breasts and pectorals bend as one rigid thorax while the
+abdomen folds. Lumbar bends preserve the buttock origins. Turning the neck leaves
+the shoulders in place; `shoulder` bones shrug the clavicles. Positive local X
 on either thigh lifts the knee forward; negative local X on the shin bends the
 knee. The face and chin follow the head rigidly, with blending confined to the
 neck attachment. Shape controls are disabled while rigged.

@@ -12,10 +12,13 @@ from .digits import chains, bind_digits, bind_nails, joint_blend
 from .limits import install_limits
 
 TAG = "base_modeler_simple_rig"
-BINDING_SCHEMA = 7
+BINDING_SCHEMA = 8
 # The first binding schema with native joint limits and root/core-only moves.
 LIMITS_SCHEMA = 7
 WEIGHT_STEPS = 32768
+CHEST_Z = 1.21
+# Per-vertex share of linear skinning, blended over the dual-quaternion result.
+LINEAR_GROUP = "base_modeler_linear_skinning"
 
 
 def rig_for(root):
@@ -45,8 +48,10 @@ def skeleton():
     add("root", center(0, 0), center(0, 0.16), deform=False)
     add("core", center(0.015, 0.97), center(0.005, 1.12), "root", deform=False)
     add("pelvis", center(0.015, 0.97), center(0.005, 1.12), "root")
-    add("spine", center(0.005, 1.12), center(0.005, 1.28), "core")
-    add("chest", center(0.005, 1.28), center(0.005, 1.445), "spine")
+    # The chest pivots at the thoracolumbar junction below the breasts, so the
+    # ribcage, breasts and pectorals bend as one rigid thorax.
+    add("spine", center(0.005, 1.12), center(0.005, CHEST_Z), "core")
+    add("chest", center(0.005, CHEST_Z), center(0.005, 1.445), "spine")
     add("neck", center(0.005, 1.445), center(0.008, 1.563), "chest")
     add("head", center(0.008, 1.563), center(0.008, 1.733), "neck")
     for side, sign in (("L", 1), ("R", -1)):
@@ -184,28 +189,51 @@ def skin_weights(points, arm_ownership, names):
     y = points[:, 1]
     z = points[:, 2]
     ax = abs(x)
-    # Interpolate the torso through the spine, then give the complete face and
-    # cranium to the head. The matching neck boundary receives identical weights.
+    # Each torso transition is centred on its child joint. "above[k]" is the
+    # share carried by torso bone k+1 and its descendants; ordered intervals
+    # keep every bone weight nonnegative.
     # The iliac crest and sacrum belong to the pelvis. Begin the lumbar
     # blend above them, spreading abdominal motion through the waist rather
     # than dragging the gluteal origins up with the lower spine.
     rear = smooth(-0.025, 0.045, y)
-    levels = (1.035 + 0.045 * rear, 1.235, 1.34, 1.465, 1.565)
+    above = (
+        smooth(0.995 + 0.085 * rear, 1.20, z),
+        # Lumbar and thoracic folds share the short front abdomen, stacked
+        # navel-down and navel-up. Behind, they follow the lumbar and lower
+        # thoracic spine. Crowding the chest fold under the breasts crushes
+        # the upper rectus segments; placing it through them folds the breasts.
+        smooth(1.10 + 0.05 * rear, 1.225 + 0.055 * rear, z),
+        # The neck base sits higher behind (C7) than at the sternal notch.
+        smooth(1.40 + 0.03 * rear, 1.48 + 0.03 * rear, z),
+        smooth(1.465, 1.565, z),
+    )
     torso = ("pelvis", "spine", "chest", "neck", "head")
     for i, name in enumerate(torso):
-        low = np.ones(count) if i == 0 else smooth(levels[i - 1], levels[i], z)
-        high = (
-            np.ones(count)
-            if i == len(torso) - 1
-            else 1 - smooth(levels[i], levels[i + 1], z)
-        )
-        w[:, lookup[name]] = low * high
+        low = np.ones(count) if i == 0 else above[i - 1]
+        high = np.zeros(count) if i == len(torso) - 1 else above[i]
+        w[:, lookup[name]] = low - high
+    pelvis, spine, chest = (lookup[n] for n in ("pelvis", "spine", "chest"))
+    neck, head_bone = lookup["neck"], lookup["head"]
+    # Breasts ride on the ribcage. A lumbar gradient through their lower
+    # half folds them in half when the chest bends.
+    breast_radius = np.sqrt(((ax - 0.07) / 0.08) ** 2 + ((z - 1.305) / 0.10) ** 2)
+    breast = (1 - smooth(0.75, 1.15, breast_radius)) * (1 - smooth(-0.08, -0.03, y))
+    for column in (pelvis, spine):
+        moved = w[:, column] * breast
+        w[:, column] -= moved
+        w[:, chest] += moved
     face = (1 - smooth(-0.060, -0.020, y)) * smooth(1.495, 1.520, z)
     head = np.maximum(smooth(1.515, 1.565, z), face)
     # Retain the chest/neck transition, replacing only the neck/head split.
-    neck_head = w[:, lookup["neck"]] + w[:, lookup["head"]]
-    w[:, lookup["head"]] = neck_head * head
-    w[:, lookup["neck"]] = neck_head - w[:, lookup["head"]]
+    neck_head = w[:, neck] + w[:, head_bone]
+    w[:, head_bone] = neck_head * head
+    w[:, neck] = neck_head - w[:, head_bone]
+    # The neck is a narrow column. Trapezius slopes and clavicles beside it
+    # belong to the thorax, otherwise turning the head drags the shoulders.
+    lateral = smooth(0.055, 0.13, ax) * (1 - smooth(1.48, 1.52, z))
+    moved = w[:, neck] * lateral
+    w[:, neck] -= moved
+    w[:, chest] += moved
     # The medial crotch blends into the pelvis only near the hip. Applying
     # this width gate down the entire leg pins inner knees, ankles and toes
     # to the pelvis and tears their silhouette when the thigh rotates.
@@ -223,9 +251,24 @@ def skin_weights(points, arm_ownership, names):
     w *= ((1 - arms) * (1 - legs))[:, None]
     for side, sign in (("L", 1), ("R", -1)):
         side_mask = (x * sign >= 0).astype(np.float32)
-        # A short clavicle transition seats the shoulder on the chest. Each
-        # limb then blends locally around its actual elbow/wrist or knee/ankle.
-        clavicle = 1 - smooth(0.12, 0.19, ax)
+        # The clavicle and upper trapezius lift with the shoulder girdle;
+        # the midline and lower ribcage stay with the chest.
+        girdle = (
+            0.5
+            * side_mask
+            * smooth(0.05, 0.12, ax)
+            * smooth(1.37, 1.43, z)
+            * (1 - smooth(1.50, 1.53, z))
+        )
+        shoulder = lookup["shoulder." + side]
+        for column in (chest, neck):
+            moved = w[:, column] * girdle
+            w[:, column] -= moved
+            w[:, shoulder] += moved
+        # The deltoid wraps the glenohumeral joint and follows the humerus;
+        # centre the girdle/arm transition on that joint. Each limb then
+        # blends locally around its actual elbow/wrist or knee/ankle.
+        clavicle = 1 - joint_blend(0.085, 0.165, ax)
         fore = joint_blend(0.35, 0.43, ax)
         hand = smooth(0.53, 0.575, ax)
         a = arms * side_mask
@@ -252,6 +295,30 @@ def skin_weights(points, arm_ownership, names):
             w[:, lookup[name + "." + side]] += a * value
     w /= np.maximum(w.sum(1)[:, None], 1e-20)
     return w
+
+
+def linear_blend(points):
+    """Share of linear skinning around the hips, from rest coordinates.
+
+    Dual quaternions keep knees, elbows and twisting forearms from collapsing,
+    but swing the buttock into a lump below a flexed thigh and overstretch the
+    hamstrings. The pelvis/thigh zone therefore fades to linear blending.
+    """
+    z = points[:, 2]
+    # The anterior groin crease compresses; keep it mostly dual-quaternion.
+    rear = 0.3 + 0.7 * smooth(-0.04, 0.03, points[:, 1])
+    zone = smooth(0.62, 0.74, z) * (1 - smooth(1.10, 1.18, z))
+    return (zone * rear).astype(np.float32)
+
+
+def _upload_group(group, ticks):
+    """Add quantized weights in batches of equal value, skipping zeros."""
+    indices = np.flatnonzero(ticks > 0)
+    indices = indices[np.argsort(ticks[indices], kind="stable")]
+    values = ticks[indices]
+    for batch in np.split(indices, np.flatnonzero(values[1:] != values[:-1]) + 1):
+        if len(batch):
+            group.add(batch.tolist(), float(ticks[batch[0]]) / WEIGHT_STEPS, "REPLACE")
 
 
 def _barycentric(points, corners):
@@ -329,6 +396,14 @@ def bind_weights(cache, reference, names, bones):
                 column = names.index(name)
                 weights[a:b, pelvis] += weights[a:b, column]
                 weights[a:b, column] = 0.0
+        # Likewise the pectorals arise from the clavicle and sternum: their
+        # medial clavicular head must not turn with the neck.
+        elif region_name(ob) == "Pectoralis_major":
+            chest = names.index("chest")
+            for name in ("neck", "head"):
+                column = names.index(name)
+                weights[a:b, chest] += weights[a:b, column]
+                weights[a:b, column] = 0.0
     # Nails are rigid plates: bind each connected nail to its distal phalanx,
     # rather than interpolating across an interphalangeal weight transition.
     for ob, a, b in cache["slices"]:
@@ -353,11 +428,13 @@ def bind_weights(cache, reference, names, bones):
             # The rectus retains a small proximal pelvic attachment. Its
             # thick cap must travel mostly with the femur to avoid a folded
             # lip when lifting the knee, while the vasti attach to the femur.
-            retained = (
-                0.15 * smooth(0.93, 1.02, reference[ids, 2])
-                if region_name(ob) == "Rectus_femoris"
-                else 0.0
-            )
+            z = reference[ids, 2]
+            # Tips above the hip pivot (0.97 m) keep most of the skin's pelvic
+            # share: bound to the femur they swing back through the gluteus
+            # when the thigh flexes; pinned fully they overstretch.
+            retained = 0.65 * smooth(0.95, 1.06, z)
+            if region_name(ob) == "Rectus_femoris":
+                retained = np.maximum(retained, 0.15 * smooth(0.93, 1.02, z))
             proximal = weights[ids, pelvis].copy()
             if region_name(ob) == "Rectus_femoris":
                 spine = names.index("spine")
@@ -380,6 +457,8 @@ def bind_weights(cache, reference, names, bones):
             "Forearm_flexor_group",
             "Forearm_extensor_group",
             "Brachioradialis",
+            "Trapezius",
+            "Sternocleidomastoid",
         ):
             continue
         edge = np.array([e.vertices[:] for e in ob.data.edges], dtype=np.int32)
@@ -411,7 +490,7 @@ def generate(context, root, cache, reference):
         raise ValueError("This model already has a simple rig.")
     names = [b[0] for b in skeleton() if b[4]]
     for ob, _, _ in cache["slices"]:
-        if any(ob.vertex_groups.get(name) for name in names):
+        if any(ob.vertex_groups.get(name) for name in (*names, LINEAR_GROUP)):
             raise ValueError(
                 "An existing vertex group uses a rig bone name: " + ob.name
             )
@@ -587,25 +666,21 @@ def generate(context, root, cache, reference):
         for ob, a, b in cache["slices"]:
             for j, name in enumerate(names):
                 column = weights[a:b, j]
-                positive = column > 0
-                if not positive.any():
-                    continue
-                group = ob.vertex_groups.new(name=name)
-                indices = np.flatnonzero(positive)
-                indices = indices[np.argsort(column[indices])]
-                values = column[indices]
-                batches = np.split(
-                    indices, np.flatnonzero(values[1:] != values[:-1]) + 1
-                )
-                for batch in batches:
-                    group.add(
-                        batch.tolist(),
-                        float(column[batch[0]]) / WEIGHT_STEPS,
-                        "REPLACE",
-                    )
+                if column.any():
+                    _upload_group(ob.vertex_groups.new(name=name), column)
             modifier = ob.modifiers.new("Base Modeler Simple Rig", "ARMATURE")
             modifier.object = rig
             modifier.use_deform_preserve_volume = True
+            linear = np.rint(linear_blend(reference[a:b]) * WEIGHT_STEPS).astype(int)
+            if linear.any():
+                # A multi-modifier interpolates from the dual-quaternion
+                # result by its group weight; unweighted vertices are skipped.
+                _upload_group(ob.vertex_groups.new(name=LINEAR_GROUP), linear)
+                blend = ob.modifiers.new("Base Modeler Linear Skinning", "ARMATURE")
+                blend.object = rig
+                blend.use_deform_preserve_volume = False
+                blend.use_multi_modifier = True
+                blend.vertex_group = LINEAR_GROUP
         bpy.ops.object.mode_set(mode="POSE")
         return rig
     except Exception:
@@ -640,7 +715,7 @@ def remove(context, root):
         for modifier in list(ob.modifiers):
             if modifier.type == "ARMATURE" and modifier.object == rig:
                 ob.modifiers.remove(modifier)
-        for name in names:
+        for name in (*names, LINEAR_GROUP):
             group = ob.vertex_groups.get(name)
             if group:
                 ob.vertex_groups.remove(group)

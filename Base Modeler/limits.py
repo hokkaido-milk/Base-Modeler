@@ -10,11 +10,14 @@ from math import radians
 
 def rotation_limits(name):
     """Return XYZ intervals; Y is each bone's longitudinal/twist axis."""
+    # Positive X flexes the trunk forward. Spine and chest together reach a
+    # 100-degree forward bend (lumbar plus thoracic); core bends the whole
+    # trunk over the hips, sharing 35% with the pelvis.
     central = {
-        "core": ((-25, 40), (-20, 20), (-20, 20)),
+        "core": ((-30, 90), (-30, 30), (-30, 30)),
         "pelvis": ((-25, 30), (-25, 25), (-20, 20)),
-        "spine": ((-20, 35), (-20, 20), (-25, 25)),
-        "chest": ((-15, 25), (-25, 25), (-20, 20)),
+        "spine": ((-30, 60), (-30, 30), (-35, 35)),
+        "chest": ((-20, 40), (-35, 35), (-25, 25)),
         "neck": ((-35, 40), (-55, 55), (-30, 30)),
         "head": ((-20, 25), (-25, 25), (-15, 15)),
     }
@@ -43,7 +46,8 @@ def rotation_limits(name):
             )
         return ((-35, 50), (0, 0), (-8, 8)) if joint == 1 else ((0, 70), (0, 0), (0, 0))
     bounds = {
-        "shoulder": ((-15, 25), (-15, 15), (-20, 20)),
+        # Positive X elevates the clavicle (shrug); Z protracts/retracts it.
+        "shoulder": ((-10, 40), (-15, 15), (-25, 25)),
         # Rest arms are abducted 90 degrees; negative X lowers them.
         "upper_arm": ((-100, 90), (-85, 85), (-100, 50)),
         # Elbow roll places X on the flexion axis, toward the front on both sides.

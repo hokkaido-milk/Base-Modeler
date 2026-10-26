@@ -52,8 +52,11 @@ assert rig["base_modeler_binding_schema"] == bm.rig.BINDING_SCHEMA
 for ob, a, b in c["slices"]:
     if ob.name.startswith(("Body_Surface", "Vastus_lateralis", "Vastus_medialis")):
         group = ob.vertex_groups.get("pelvis")
+        # Vastus shafts follow the femur; only tips above the hip pivot
+        # (0.97 m) share the pelvis so they cannot swing through the gluteus.
+        limit = 0.7 if ob == skin else 0.95
         for v in ob.data.vertices:
-            if ob != skin or neutral[a + v.index, 2] < 0.7:
+            if neutral[a + v.index, 2] < limit:
                 assert (
                     not any(
                         g.group == group.index and g.weight > 1e-7 for g in v.groups
