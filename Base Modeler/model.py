@@ -7,7 +7,7 @@ from .controls import CONTROLS
 from .deform import compile_fields, evaluate, apply_height
 from .surface import prepare_surfaces, match_skin_tone
 from .topology import repair_tessellation
-from .rig import rig_for
+from .rig import rig_for, upgrade_rig_display
 from .identity import REGIONS, meshes_for, region_name, assign_regions
 from .constants import REST, SHAPE_SCHEMA
 
@@ -276,6 +276,9 @@ def upgrade_loaded_models(*args):
             try:
                 assign_regions(root)
                 repair_tessellation(meshes_for(root))
+                rig = rig_for(root)
+                if rig is not None:
+                    upgrade_rig_display(rig)
                 if root.get("base_modeler_shape_schema", 0) < SHAPE_SCHEMA:
                     if root.get("base_modeler_shape_schema", 0) < 10:
                         match_skin_tone(meshes_for(root))

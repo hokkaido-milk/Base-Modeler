@@ -10,6 +10,7 @@ from .identity import region_name
 from .fitting import SkinSections
 from .digits import chains, bind_digits, bind_nails, joint_blend
 from .limits import install_limits
+from . import widgets
 
 TAG = "base_modeler_simple_rig"
 BINDING_SCHEMA = 8
@@ -17,8 +18,49 @@ BINDING_SCHEMA = 8
 LIMITS_SCHEMA = 7
 WEIGHT_STEPS = 32768
 CHEST_Z = 1.21
+DISPLAY_SCHEMA = 2
 # Per-vertex share of linear skinning, blended over the dual-quaternion result.
 LINEAR_GROUP = "base_modeler_linear_skinning"
+
+
+def install_display(rig):
+    """Readable proportional bones, with solid rings for the movable controls.
+
+    Display only: bones, constraints and weights are unchanged. The rig draws
+    in front of the body, so the octahedra stay visible inside the limbs.
+    """
+    rig.show_in_front = True
+    rig.data.display_type = "OCTAHEDRAL"
+    # Root and core are the only translatable bones. Core shares its pivot with
+    # the pelvis, so a hip ring is the only way to pick it out reliably.
+    size = (
+        rig.data.bones["head"].head_local - rig.data.bones["root"].head_local
+    ).length
+    controls = (
+        ("root", "Base Modeler Root Ring", 0.20, 0.17, 0.0, "THEME03"),
+        ("core", "Base Modeler Core Ring", 0.15, 0.115, 0.06, "THEME09"),
+    )
+    for name, label, width, depth, lift, palette in controls:
+        pb = rig.pose.bones[name]
+        if pb.custom_shape is None:
+            widgets.assign(
+                pb,
+                widgets.ring(label),
+                (width * size, width * size, depth * size),
+                (0.0, lift * size, 0.0),
+            )
+        pb.bone.color.palette = palette
+    rig["base_modeler_display_schema"] = DISPLAY_SCHEMA
+
+
+def upgrade_rig_display(rig):
+    """Apply current widgets and target solving to a rig from an older file."""
+    if rig.get("base_modeler_display_schema", 1) < DISPLAY_SCHEMA:
+        install_display(rig)
+    if rig.get("base_modeler_target_controls"):
+        from .targets import upgrade
+
+        upgrade(rig)
 
 
 def rig_for(root):
@@ -518,10 +560,6 @@ def generate(context, root, cache, reference):
         else fit_skeleton(reference, reference, skin_indices, triangles)
     )
     weights = bind_weights(cache, reference, names, neutral_bones)
-    skin_start, skin_end = next((a, b) for ob, a, b in cache["slices"] if ob == skin)
-    fitted_surface = BVHTree.FromPolygons(
-        current[skin_start:skin_end], triangles, all_triangles=True
-    )
     data = bpy.data.armatures.new("Base Modeler Simple Rig")
     rig = None
     try:
@@ -536,11 +574,6 @@ def generate(context, root, cache, reference):
         rig[TAG] = 1
         rig["base_modeler_binding_schema"] = BINDING_SCHEMA
         rig["base_modeler_group_names"] = json.dumps(names)
-        rig.show_in_front = True
-        # A long octahedron is much wider than a narrow wrist even when its axis
-        # is correctly fitted. Slender boxes show the actual shaft without hiding
-        # bones or changing the deformation skeleton.
-        data.display_type = "BBONE"
         data.pose_position = "POSE"
         bpy.ops.object.select_all(action="DESELECT")
         rig.select_set(True)
@@ -564,18 +597,6 @@ def generate(context, root, cache, reference):
             bone.tail = tail
             bone.use_deform = deform
             digit = name.startswith(("finger_", "toe_"))
-            width = min(
-                float(np.linalg.norm(tail - head)) * 0.055, 0.0013 if digit else 0.003
-            )
-            if "." in name:
-                clearance = min(
-                    fitted_surface.find_nearest(head * (1 - t) + tail * t)[3]
-                    for t in np.linspace(0, 1, 25)
-                )
-                width = min(width, float(clearance) * 0.22)
-            bone.bbone_x = width
-            bone.bbone_z = width
-            bone.bbone_segments = 1
             category = (
                 (
                     ("Left " if name.endswith(".L") else "Right ")
@@ -648,10 +669,6 @@ def generate(context, root, cache, reference):
         carry.target_space = "LOCAL"
         carry.owner_space = "LOCAL"
         carry.use_offset = True
-        # The core and pelvis share a rest pivot. A larger wire envelope makes
-        # the core easy to distinguish without adding scene mesh objects.
-        data.bones["core"].bbone_x = 0.014
-        data.bones["core"].bbone_z = 0.014
         for pb in rig.pose.bones:
             # Twist about the bent forearm's longitudinal axis, without an
             # Euler singularity at a normal 90-degree elbow bend.
@@ -663,6 +680,7 @@ def generate(context, root, cache, reference):
                 if pb.name.endswith(".L")
                 else "THEME01" if pb.name.endswith(".R") else "THEME03"
             )
+        install_display(rig)
         for ob, a, b in cache["slices"]:
             for j, name in enumerate(names):
                 column = weights[a:b, j]
@@ -720,9 +738,7 @@ def remove(context, root):
             if group:
                 ob.vertex_groups.remove(group)
     data = rig.data
-    from .targets import cleanup
-
-    cleanup(rig)
+    widgets.cleanup(rig)
     bpy.data.objects.remove(rig, do_unlink=True)
     if data.users == 0:
         bpy.data.armatures.remove(data)

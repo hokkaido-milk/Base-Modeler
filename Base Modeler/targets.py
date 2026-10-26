@@ -1,31 +1,71 @@
 """Optional native target controls layered over the existing weighted FK rig."""
 
-from math import cos, sin, tau, radians
+from math import radians
 import bpy
 from .limits import rotation_limits
+from . import widgets
 
 CHANNELS = ("hand.L", "hand.R", "foot.L", "foot.R", "head")
 TAG = "base_modeler_target_controls"
+SOLVER_SCHEMA = 2
+LIMBS = {
+    "hand": ("upper_arm.", "forearm.", "hand."),
+    "foot": ("thigh.", "shin.", "foot."),
+}
 
 
-def _shape(name):
-    vertices, edges = [], []
-    for axis in range(3):
-        start = len(vertices)
-        for i in range(32):
-            p = [0.0, 0.0, 0.0]
-            p[(axis + 1) % 3] = cos(tau * i / 32)
-            p[(axis + 2) % 3] = sin(tau * i / 32)
-            vertices.append(p)
-            edges.append((start + i, start + (i + 1) % 32))
-    start = len(vertices)
-    vertices.extend(((0, 0, 0), (0, 1.6, 0), (0.2, 1.3, 0), (-0.2, 1.3, 0)))
-    edges.extend(((start, start + 1), (start + 1, start + 2), (start + 1, start + 3)))
-    mesh = bpy.data.meshes.new(name)
-    mesh.from_pydata(vertices, edges, [])
-    ob = bpy.data.objects.new(name, mesh)
-    ob[TAG] = True
-    return ob
+def tune_solver(rig):
+    """Keep dragged limbs continuous; changes no bones, weights or controls.
+
+    A limb chain has redundant twist, and an endpoint orientation goal often
+    conflicts with the wrist/ankle limits. Untuned, the solver hops between
+    equally good twists and flips the knee or elbow as a ball moves.
+    """
+    for side in "LR":
+        for kind, chain in LIMBS.items():
+            upper, middle, end = (rig.pose.bones[prefix + side] for prefix in chain)
+            # Prefer the existing twist; reach with the shoulder/hip and elbow.
+            upper.ik_stiffness_y = middle.ik_stiffness_y = 0.9
+            # The wrist/ankle orients the endpoint but should not do the reaching:
+            # pinned against its limit it hands sudden corrections to the twists.
+            end.ik_stiffness_x = end.ik_stiffness_z = 0.9
+            if kind == "foot":
+                # The knee is a hinge for the solver; its small FK play remains.
+                middle.lock_ik_y = middle.lock_ik_z = True
+            # Reach the ball first and orient as far as the joints allow.
+            constraint = end.constraints.get("Target limb IK")
+            if constraint:
+                constraint.orient_weight = 0.1
+    rig["base_modeler_target_solver"] = SOLVER_SCHEMA
+
+
+def style_targets(rig):
+    """Solid balls, larger for the head, replacing any earlier wire widgets."""
+    size = rig.get("base_modeler_target_scale", 1.0)
+    old = {rig.pose.bones["target_" + ch].custom_shape for ch in CHANNELS}
+    shape = widgets.ball("Base Modeler Target Ball")
+    for ch in CHANNELS:
+        pb = rig.pose.bones["target_" + ch]
+        radius = {"head": 0.05, "hand": 0.032}.get(ch[:4], 0.04) * size
+        widgets.assign(pb, shape, (radius,) * 3)
+        pb.bone.color.palette = (
+            "THEME04"
+            if ch.endswith(".L")
+            else "THEME01" if ch.endswith(".R") else "THEME06"
+        )
+    for ob in old:
+        if ob is not None and ob.users == 0 and any(map(ob.get, widgets.LEGACY_TAGS)):
+            mesh = ob.data
+            bpy.data.objects.remove(ob)
+            if mesh.users == 0:
+                bpy.data.meshes.remove(mesh)
+
+
+def upgrade(rig):
+    """Bring targets saved by an earlier release to the current behaviour."""
+    if rig.get("base_modeler_target_solver", 1) < SOLVER_SCHEMA:
+        tune_solver(rig)
+        style_targets(rig)
 
 
 def _driver(constraint, rig, channel):
@@ -73,21 +113,13 @@ def install(context, rig):
         b.use_deform = False
         collection.assign(b)
     bpy.ops.object.mode_set(mode="OBJECT")
-    ball = _shape("Base Modeler Target Ball")
+    style_targets(rig)
     for ch in CHANNELS:
         rig["target_" + ch] = False
         pb = rig.pose.bones["target_" + ch]
-        pb.custom_shape = ball
-        pb.use_custom_shape_bone_size = False
-        pb.custom_shape_scale_xyz = (0.035 * size,) * 3
         pb.lock_scale = (True,) * 3
         pb.rotation_mode = "XYZ"
         pb.lock_rotation = (ch == "head",) * 3
-        pb.bone.color.palette = (
-            "THEME04"
-            if ch.endswith(".L")
-            else "THEME01" if ch.endswith(".R") else "THEME03"
-        )
         if ch == "head":
             c = rig.pose.bones["head"].constraints.new("DAMPED_TRACK")
             c.name = "Target gaze"
@@ -125,6 +157,7 @@ def install(context, rig):
             c.weight = 1.0
             c.orient_weight = 1.0
         _driver(c, rig, ch)
+    tune_solver(rig)
     rig[TAG] = 1
     for ch in CHANNELS:
         set_mode(context, rig, ch, True)
@@ -200,21 +233,3 @@ def set_mode(context, rig, channel, enabled):
         rig.pose.bones["target_" + ch].hide = not enabled
     rig.update_tag()
     context.view_layer.update()
-
-
-def cleanup(rig):
-    """Release only custom-shape data owned by this optional control layer."""
-    shapes = {
-        pb.custom_shape
-        for pb in rig.pose.bones
-        if pb.custom_shape and pb.custom_shape.get(TAG)
-    }
-    for pb in rig.pose.bones:
-        if pb.custom_shape in shapes:
-            pb.custom_shape = None
-    for ob in shapes:
-        if ob.users == 0:
-            mesh = ob.data
-            bpy.data.objects.remove(ob)
-            if mesh.users == 0:
-                bpy.data.meshes.remove(mesh)

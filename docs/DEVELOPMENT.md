@@ -60,6 +60,12 @@ indices; regenerate them when replacing source geometry. Internal data-schema
 identifiers support saved-model compatibility and are independent of the public
 release version.
 
+`tools/remove_face_shells.py` deletes the eyebrow, eyelid-line and eyelash
+shells from the head (they float above finished skin). It keeps their vertices
+as loose points so vertex-indexed assets stay aligned, and is idempotent. Run it
+after `load_plugin.py` and before `clean_assets.py` in the foundation refresh
+command above.
+
 `tools/refine_anatomy.py` rebuilds `assets/anatomy_sculpt.npz` from immutable
 rest coordinates plus the earlier foundation corrections. Run it through
 Blender after `tools/load_plugin.py`. It deliberately bypasses its own output,

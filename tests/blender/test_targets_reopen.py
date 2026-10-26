@@ -8,7 +8,8 @@ assert not hasattr(bpy.types.Object, "base_modeler")
 rig = next(o for o in bpy.data.objects if o.type == "ARMATURE")
 for ch in ("hand.L", "hand.R", "foot.L", "foot.R"):
     ctrl = rig.pose.bones["target_" + ch]
-    assert ctrl.custom_shape and len(ctrl.custom_shape.data.edges) == 99
+    # Solid widgets are clickable from any angle and survive without the add-on.
+    assert ctrl.custom_shape and len(ctrl.custom_shape.data.polygons) > 100
     m = ctrl.matrix @ Matrix.Rotation(radians(3), 4, "X")
     m.translation += Vector((0, -0.01, 0.01))
     ctrl.matrix = m

@@ -20,7 +20,7 @@ neutral = cache["last_result"].copy()
 assert bpy.ops.base_modeler.generate_rig() == {"FINISHED"}
 rig = bm.rig_for(root)
 assert len(rig.data.bones) == 83
-assert rig.data.display_type == "BBONE"
+assert rig.data.display_type == "OCTAHEDRAL"
 assert len(rig.data.collections) == 6
 assert not rig.data.collections["Deformation"].is_visible
 

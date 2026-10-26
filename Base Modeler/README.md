@@ -28,7 +28,8 @@ Blender bones and modifiers and remains poseable without the plugin installed.
 Each hand has three bones per finger (including the thumb metacarpal). Each foot
 has two bones in the big toe and three in each other toe. The `toe.L` / `toe.R`
 bones move the whole toe bank. Bone collections separate the body, hands and
-feet. Slender bone displays are sized to fit the skin, and nails follow their
+feet. Bones draw as proportional octahedra in front of the body; `root` (floor ring)
+and `core` (hip ring) have solid ring controls. Nails follow their
 distal phalanges as rigid plates. The rig uses direct FK posing without IK. Joint translation and bone scaling are
 locked; rotation limits prevent gross over-bending. The hidden forearm twist
 bones distribute rotation from the elbow toward the wrist.

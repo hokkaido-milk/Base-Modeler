@@ -63,7 +63,7 @@ for label, settings in (
     neutral = np.empty((len(skin.data.vertices), 3), np.float32)
     skin.data.vertices.foreach_get("co", neutral.ravel())
     rig = bm.rig_for(root)
-    assert rig.data.display_type == "BBONE"
+    assert rig.data.display_type == "OCTAHEDRAL"
     for side in ("L", "R"):
         for control in ("forearm.", "hand.", "upper_arm."):
             for axis in range(3):
@@ -104,22 +104,6 @@ for label, settings in (
                             t,
                             "axis",
                         )
-                    for t in np.linspace(0.05, 0.95, 13):
-                        for x in (-pb.bone.bbone_x, pb.bone.bbone_x):
-                            for z in (-pb.bone.bbone_z, pb.bone.bbone_z):
-                                point = (
-                                    matrix[:3, :3] @ np.array((x, length * t, z))
-                                    + matrix[:3, 3]
-                                )
-                                assert inside(bvh, point), (
-                                    label,
-                                    control,
-                                    side,
-                                    axis,
-                                    angle,
-                                    t,
-                                    "display",
-                                )
                     rows.append(
                         {
                             "shape": label,

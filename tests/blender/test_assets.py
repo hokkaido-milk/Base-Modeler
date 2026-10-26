@@ -45,7 +45,7 @@ assert all(i.packed_file and i.filepath == "//Face_Albedo.png" for i in bpy.data
 # Inspect the clean editable environment independently of the library.
 bpy.ops.wm.open_mainfile(filepath=str(ROOT / "examples/Base Modeler.blend"))
 assert len(bpy.data.objects) == 30 and len(bpy.data.meshes) == 29
-assert len(bpy.data.materials) == 32
+assert len(bpy.data.materials) == 31
 assert len([image for image in bpy.data.images if image.source == "FILE"]) == 1
 assert all(image.source in {"FILE", "VIEWER"} for image in bpy.data.images)
 assert not bpy.data.cameras and not bpy.data.lights and not bpy.data.armatures
@@ -68,7 +68,7 @@ assert all(
 report = {
     "mesh_objects": 29,
     "vertices": 271342,
-    "materials": 32,
+    "materials": 31,
     "packed_images": 1,
     "unused_scene_data_removed": True,
     "portable_texture": True,

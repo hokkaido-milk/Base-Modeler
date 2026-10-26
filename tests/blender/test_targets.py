@@ -7,6 +7,7 @@ import numpy as np
 from mathutils import Vector, Matrix
 import base_modeler as bm
 from base_modeler.targets import CHANNELS, TAG, set_mode
+from base_modeler.widgets import TAG as WIDGET
 
 ROOT = Path(__file__).resolve().parents[2]
 bm.register()
@@ -119,5 +120,5 @@ report = dict(cases=rows, head_tracks=True, no_stretch=True, passed=True)
 )
 assert bpy.ops.base_modeler.remove_rig() == {"FINISHED"}
 assert bm.rig_for(root) is None
-assert not any(ob.get(TAG) for ob in bpy.data.objects), "Orphaned target widgets"
+assert not any(ob.get(TAG) or ob.get(WIDGET) for ob in bpy.data.objects), "Orphans"
 print("TARGET CONTROLS", json.dumps(report), flush=True)

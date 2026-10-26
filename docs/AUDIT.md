@@ -29,8 +29,8 @@ old packages and authoring references are kept in the ignored local archive.
   older bindings for removal and regeneration to apply the corrected fit.
 - Each hand has 15 digit bones, and each foot has 14. Skin sections fit their
   joints; local X curls toward the palm or sole. Five bone collections separate
-  the body and each hand/foot. Slim bone displays use actual skin clearance,
-  avoiding an octahedral shaft protruding through a narrow forearm.
+  the body and each hand/foot. Bones draw as octahedra in front of the body;
+  root and core have solid ring widgets because core shares the pelvis pivot.
 - Digit binding follows skin-edge distances from terminal caps, with a smooth
   partition at webs and local capsule/thenar support. Seeds cannot jump to a
   neighbouring toe across an air gap. Joint blends limit peak weight gradients;
@@ -69,7 +69,7 @@ old packages and authoring references are kept in the ignored local archive.
 
 ## Data cleanup
 
-The foundation and example retain 29 meshes, 271,342 vertices, 32 used materials
+The foundation and example retain 29 meshes, 271,342 vertices, 31 used materials
 and one packed face texture. Cameras, lights, armatures, animation actions,
 embedded text blocks, unused materials, unused source vertex groups, unused
 shader groups, development notes and old texture directory paths are removed.
