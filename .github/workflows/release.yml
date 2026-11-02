@@ -1,0 +1,70 @@
+name: Release
+
+# Push a tag such as v1.3.1 whose number matches blender_manifest.toml.
+# CI must pass; then the ZIP, its SHA-256 and the extension listing
+# (index.json) are built from the tagged commit and published as the latest
+# GitHub release, which Get Extensions and the add-on's updater both read.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check tag matches the add-on version
+        run: |
+          version=$(python -c "import sys; sys.path.insert(0, 'tools'); from build import PACKAGE, parse_manifest; print(parse_manifest((PACKAGE / 'blender_manifest.toml').read_text())['version'])")
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match manifest version ${version}"
+            exit 1
+          fi
+          echo "VERSION=${version}" >> "$GITHUB_ENV"
+
+      - name: Build release assets
+        run: python tools/build.py
+
+      - name: Check the listing matches the archive
+        run: |
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          zip_path = Path("dist/Base_Modeler.zip")
+          entry = json.loads(Path("dist/index.json").read_text())["data"][0]
+          data = zip_path.read_bytes()
+          assert entry["version"] == os.environ["VERSION"], entry["version"]
+          assert entry["archive_size"] == len(data)
+          assert entry["archive_hash"] == "sha256:" + hashlib.sha256(data).hexdigest()
+          repo = os.environ["GITHUB_REPOSITORY"].lower()
+          url = entry["archive_url"].lower()
+          assert url == f"https://github.com/{repo}/releases/download/{os.environ['GITHUB_REF_NAME']}/base_modeler.zip", url
+          print("index.json matches", zip_path, entry["archive_hash"])
+          PY
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            dist/Base_Modeler.zip dist/Base_Modeler.zip.sha256 dist/index.json \
+            --verify-tag --latest \
+            --title "Base Modeler ${VERSION}" \
+            --generate-notes

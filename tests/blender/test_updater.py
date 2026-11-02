@@ -100,7 +100,9 @@ try:
     updated = sys.modules[MODULE]
     assert updated is not installed
     assert updated.VERSION == tuple(map(int, newer.split(".")))
-    on_disk = (Path(repo.directory) / "base_modeler" / "blender_manifest.toml").read_text()
+    on_disk = (
+        Path(repo.directory) / "base_modeler" / "blender_manifest.toml"
+    ).read_text()
     assert parse_manifest(on_disk)["version"] == newer
     assert updated.updater.state()["status"] == "IDLE"
 

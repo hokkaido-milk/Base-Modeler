@@ -22,17 +22,27 @@ whose `archive_url` points at this version's GitHub release asset.
 
 ## Release
 
-Bump `version` in `Base Modeler/blender_manifest.toml` and `VERSION` in
-`Base Modeler/constants.py`, run the full suite, commit and push, then:
+Releases are published by GitHub Actions. Bump `version` in
+`Base Modeler/blender_manifest.toml` and `VERSION` in `Base Modeler/constants.py`,
+commit, then push the commit and a matching tag:
 
 ```sh
-python3 tools/release.py            # dry run: builds and prints the gh command
-python3 tools/release.py --publish  # creates release v<version> with gh
+git tag v1.3.1
+git push origin main v1.3.1
 ```
+
+`.github/workflows/release.yml` runs CI on the tagged commit, checks the tag
+matches the manifest version, builds the ZIP, `.sha256` and `index.json`, checks
+the listing's size, hash and URL against the ZIP, and publishes the release as
+latest. A failed check publishes nothing; fix it, delete the tag
+(`git push --delete origin v1.3.1; git tag -d v1.3.1`) and tag again.
+`.github/workflows/ci.yml` runs lint, build and the full Blender suite (Linux,
+Blender 5.2.2, NumPy path) on every push to `main` and every pull request.
+`python3 tools/release.py [--publish]` remains as a manual fallback using `gh`.
 
 The release must carry `Base_Modeler.zip`, `Base_Modeler.zip.sha256` and
 `index.json`, and be marked latest. Both update routes read
-`{URL}`:
+`https://github.com/hokkaido-milk/Base-Modeler/releases/latest/download/index.json`:
 Blender's Get Extensions (users add it as a remote repository) and the add-on's
 **Updates** box in Preferences. Never edit or re-upload a published ZIP: the hash
 in `index.json` would no longer match and installs would be refused.
