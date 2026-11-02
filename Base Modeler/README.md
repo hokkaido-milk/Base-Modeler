@@ -2,7 +2,8 @@
 
 Shape an adult anime body with 27 continuous controls, then generate a native
 83-bone FK rig (81 controls plus two hidden twist bones) for posing. The foundation, anatomy corrections and face texture
-are bundled. No external generator, Rigify or network access is required.
+are bundled. No external generator or Rigify is required. The only network access
+is an optional update check against this project's GitHub releases.
 
 ## Install
 
@@ -10,9 +11,30 @@ Requires Blender 5.2 or newer. Tested with Blender 5.2.2 LTS on Apple Silicon ma
 The optional macOS accelerator includes arm64 and x86_64 binaries. Other platforms
 use the NumPy implementation included with Blender; they have not been tested.
 
-Zip this folder's contents, including `blender_manifest.toml`, or use the supplied
-`Base_Modeler.zip`. In Blender, choose **Edit → Preferences → Add-ons → Install
-from Disk**, select the ZIP and enable **Base Modeler**.
+**Install from Blender (recommended).** In **Edit → Preferences → Get Extensions**,
+open the **Repositories** menu (top right), choose **+ → Add Remote Repository**
+and paste:
+
+```
+https://github.com/hokkaido-milk/Base-Modeler/releases/latest/download/index.json
+```
+
+Search for **Base Modeler** and choose **Install**. Updates then appear in Get
+Extensions like any other extension. Blender needs online access
+(**Preferences → System → Network**).
+
+**Install from disk.** Download `Base_Modeler.zip` from the latest GitHub release,
+or zip this folder's contents including `blender_manifest.toml`. Choose
+**Edit → Preferences → Add-ons → Install from Disk**, select the ZIP and enable
+**Base Modeler**.
+
+**Updating.** Expand Base Modeler in **Preferences → Add-ons**. The **Updates**
+box shows the installed version; **Check for Updates** asks GitHub for the latest
+release and **Install** downloads it, verifies its size and SHA-256 hash, and
+installs it in place. Restart Blender afterwards. With **Check for Updates
+Automatically** on (the default), Blender checks at most once a day at startup and
+the sidebar shows a notice when a new version is available. Nothing is checked
+while Blender's online access is off.
 
 ## Use
 

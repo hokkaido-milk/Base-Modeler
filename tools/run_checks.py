@@ -46,8 +46,8 @@ with tempfile.TemporaryDirectory(prefix="base_modeler_checks_") as tmp:
         path.mkdir(parents=True, exist_ok=True)
         env["BLENDER_USER_" + kind] = str(path)
 
-    def run(name, script, file=None, load=True, extra=()):
-        command = [args.blender, "--background"]
+    def run(name, script, file=None, load=True, extra=(), flags=()):
+        command = [args.blender, "--background", *flags]
         command += [str(file)] if file else ["--factory-startup"]
         command += ["--disable-autoexec", "--python-exit-code", "1"]
         if load:
@@ -109,6 +109,13 @@ with tempfile.TemporaryDirectory(prefix="base_modeler_checks_") as tmp:
         "test_persistence.py",
         OUT / "Length_Persistence.blend",
         extra=("--", "--reopen"),
+    )
+    run("updater", "test_updater.py", load=False)
+    run(
+        "extension_repo",
+        "test_extension_repo.py",
+        load=False,
+        flags=("--online-mode",),
     )
     if args.full:
         run("materials", "test_materials.py")

@@ -1,6 +1,6 @@
 # Release audit
 
-The shipping extension is **Base Modeler 1.2.1**. Its runtime source is
+The shipping extension is **Base Modeler 1.3.0**. Its runtime source is
 `Base Modeler/`; `dist/Base_Modeler.zip` is built from that folder without
 changing its contents. The source contains current usage documentation,
 required asset provenance and the complete code license. Development history,

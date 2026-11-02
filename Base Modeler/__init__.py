@@ -29,6 +29,7 @@ from .operators import (
     BM_OT_select_target,
 )
 from .ui import BM_PT_actions, BM_PT_body
+from . import updater
 
 __all__ = [
     "REST",
@@ -77,6 +78,7 @@ _CLASSES = (
     BM_OT_select_target,
     BM_PT_actions,
     BM_PT_body,
+    *updater.CLASSES,
 )
 
 
@@ -111,6 +113,7 @@ def register():
         elif not bpy.app.timers.is_registered(upgrade_loaded_models):
             bpy.app.timers.register(upgrade_loaded_models, first_interval=0.1)
             timer_created = True
+        updater.register()
     except Exception:
         if timer_created:
             bpy.app.timers.unregister(upgrade_loaded_models)
@@ -125,6 +128,7 @@ def register():
 
 
 def unregister():
+    updater.unregister()
     if bpy.app.timers.is_registered(upgrade_loaded_models):
         bpy.app.timers.unregister(upgrade_loaded_models)
     for hooks, handler in _handlers():

@@ -5,6 +5,7 @@ import bpy
 from .controls import GROUPS, CONTROLS
 from .model import model_for, _ERRORS
 from .rig import rig_for, BINDING_SCHEMA, LIMITS_SCHEMA
+from . import updater
 
 
 class BM_PT_actions(bpy.types.Panel):
@@ -17,6 +18,13 @@ class BM_PT_actions(bpy.types.Panel):
     bl_order = 0
 
     def draw(self, context):
+        if updater.update_available():
+            version = updater.state()["entry"]["version"]
+            self.layout.operator(
+                "base_modeler.update_show",
+                text=f"Base Modeler {version} available",
+                icon="IMPORT",
+            )
         layout = self.layout.box()
         root = model_for(context)
         layout.operator("base_modeler.create", icon="ADD")

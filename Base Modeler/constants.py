@@ -1,6 +1,6 @@
 """Release and persisted model-data identifiers."""
 
-VERSION = (1, 2, 1)
+VERSION = (1, 3, 0)
 REST = "base_modeler_rest"
 # Internal data schemas are independent of the public release number.
 SHAPE_SCHEMA = 15

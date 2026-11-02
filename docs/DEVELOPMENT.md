@@ -1,7 +1,9 @@
 # Development
 
 `Base Modeler/` is the single plugin source. Do not maintain a second runtime copy.
-Blender supplies `bpy` and NumPy; the plugin has no pip or network dependencies.
+Blender supplies `bpy` and NumPy; the plugin has no pip dependencies. Its only
+network use is the optional update check in `updater.py` (manifest permission
+`network`), which honours Blender's online-access setting.
 The only shipped native binary is an optional universal macOS accelerator, with
 its C source alongside it. Other platforms use the NumPy implementation.
 
@@ -15,6 +17,29 @@ This validates the package identity/version and produces a deterministic
 `dist/Base_Modeler.zip` plus a SHA-256 file. ZIP entries are relative to the
 plugin root. Finder-style archives containing the enclosing folder also install.
 No caches, backups, local profiles, tests or development archives are bundled.
+It also writes `dist/index.json`, a Blender extension repository listing (API v1)
+whose `archive_url` points at this version's GitHub release asset.
+
+## Release
+
+Bump `version` in `Base Modeler/blender_manifest.toml` and `VERSION` in
+`Base Modeler/constants.py`, run the full suite, commit and push, then:
+
+```sh
+python3 tools/release.py            # dry run: builds and prints the gh command
+python3 tools/release.py --publish  # creates release v<version> with gh
+```
+
+The release must carry `Base_Modeler.zip`, `Base_Modeler.zip.sha256` and
+`index.json`, and be marked latest. Both update routes read
+`{URL}`:
+Blender's Get Extensions (users add it as a remote repository) and the add-on's
+**Updates** box in Preferences. Never edit or re-upload a published ZIP: the hash
+in `index.json` would no longer match and installs would be refused.
+
+`test_updater.py` installs into a throwaway repository and updates in place from a
+`file://` listing; `test_extension_repo.py` installs and upgrades through Blender's
+native Get Extensions operators (run with `--online-mode`).
 
 On macOS, rebuild the optional native kernel with:
 
