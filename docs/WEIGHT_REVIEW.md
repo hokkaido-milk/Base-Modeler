@@ -130,6 +130,40 @@ obliques, and a head turn now stretches the trapezius at the neck base instead
 of carrying the shoulders. `test_torso_rig.py` gates breast rigidity, deep
 forward folds, neck isolation, deltoid travel, hip strain and thigh-tip travel.
 
+## Shoulder and wrist joint placement (binding schema 9)
+
+An audit of the posed rig found two joints away from the anatomy they drive.
+
+- **Wrist.** The wrist joint sat at 0.55 m from the centerline, about 3 cm up
+  the forearm, with its weight blend at 0.53-0.575 m. Bending the hand folded
+  the distal forearm instead of the wrist. The joint now sits at 0.58 m, the
+  thinnest forearm section just proximal to the thumb base, and the blend
+  (0.556-0.602 m) is centred on it. Progressive forearm twist now runs the full
+  length to the new wrist.
+- **Shoulder.** The glenohumeral joint sat at (0.13, 0.005, 1.43), at the edge
+  of the ribcage and below and in front of the arm's axis. Lowering the arm
+  swung the whole deltoid around a pivot inside the torso and left a raised
+  wing over a gap. It now sits at (0.16, 0.02, 1.445), on the humeral axis
+  under the acromion. Above the joint, the deltoid cap commits to the arm over
+  a shorter span; the axilla keeps its long, soft blend. With the arm lowered
+  80 degrees, the deltoid's 99th-percentile edge stretch falls from 1.87 to
+  1.69.
+
+- **Deltoid.** The T-pose deltoid is a contracted dome centred on the
+  shoulder joint, so plain skinning carried it down as a rigid ball over a
+  thin arm. A hidden `deltoid` helper bone on each side (85 bones total) now
+  owns a smooth share of the dome within 10 cm of its peak. It copies 60% of
+  the upper arm's rotation and, as the arm lowers, travels up to 15 mm inward
+  and 20 mm down. The deltoid then runs from the trapezius down the outer arm
+  and tapers into it. The helper is native constraint data, like the forearm
+  twist bones, and does nothing when the arm is level or raised.
+
+Elbow, hip, knee, ankle, spine and neck were reviewed in the same poses and
+left unchanged.
+
+Rigs generated before this schema keep their old joints. Remove and regenerate
+the rig to adopt the new placement.
+
 ## Validation and compatibility
 
 New tests exercise 480 rotation endpoints, local translation/scale rejection,

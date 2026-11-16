@@ -21,9 +21,9 @@ rig = bm.rig_for(root)
 neutral = {pb.name: pb.matrix.copy() for pb in rig.pose.bones}
 counts = [len(o.data.vertices) for o, _, _ in cache["slices"]]
 assert bpy.ops.base_modeler.target_controls() == {"FINISHED"}
-assert len(rig.data.bones) == 88 and rig[TAG]
+assert len(rig.data.bones) == 90 and rig[TAG]
 assert bpy.ops.base_modeler.target_controls() == {"FINISHED"}
-assert len(rig.data.bones) == 88
+assert len(rig.data.bones) == 90
 assert [len(o.data.vertices) for o, _, _ in cache["slices"]] == counts
 for name, m in neutral.items():
     pb = rig.pose.bones[name]

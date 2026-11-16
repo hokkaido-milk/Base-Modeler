@@ -47,7 +47,7 @@ assert bpy.ops.base_modeler.generate_rig() == {"FINISHED"}
 elapsed = time.perf_counter() - start
 rig = rig_for(root)
 assert bpy.context.mode == "POSE" and bpy.context.object == rig
-assert len(rig.data.bones) == 83
+assert len(rig.data.bones) == 85
 assert len(rig.pose.bones["pelvis"].constraints) == 5
 assert all(
     any(c.type == "LIMIT_SCALE" for c in pb.constraints) for pb in rig.pose.bones

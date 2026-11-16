@@ -128,7 +128,7 @@ for label, changes in cases:
             )
     if label == "neutral":
         assert abs(lookup["shin.L"][0][2] - 0.56) < 1e-6
-        assert abs(lookup["hand.L"][0][0] - bm.deform.CENTER_X - 0.55) < 1e-6
+        assert abs(lookup["hand.L"][0][0] - bm.deform.CENTER_X - bm.rig.WRIST_X) < 1e-6
         assert lookup["hand.L"][1][1] < -0.035
     rows.append(
         {

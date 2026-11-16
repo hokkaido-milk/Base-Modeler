@@ -5,7 +5,7 @@ import json
 import bpy
 import numpy as np
 import base_modeler as bm
-from base_modeler.limits import rotation_limits
+from base_modeler.limits import HELPERS, rotation_limits
 
 bm.register()
 bpy.ops.base_modeler.create()
@@ -49,7 +49,7 @@ initial_skin = evaluated_skin()
 
 cases = 0
 for pb in rig.pose.bones:
-    if pb.name.startswith("forearm_twist."):
+    if pb.name.startswith(HELPERS):
         continue
     bounds = rotation_limits(pb.name)
     if bounds is not None:

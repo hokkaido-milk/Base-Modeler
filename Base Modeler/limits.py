@@ -7,6 +7,9 @@ bounds cannot prevent every compound-pose collision.
 
 from math import radians
 
+# Hidden deformation helpers: constraint-driven, never posed directly.
+HELPERS = ("forearm_twist.", "deltoid.")
+
 
 def rotation_limits(name):
     """Return XYZ intervals; Y is each bone's longitudinal/twist axis."""
@@ -23,7 +26,7 @@ def rotation_limits(name):
     }
     if name in central:
         return central[name]
-    if name == "root" or name.startswith("forearm_twist."):
+    if name == "root" or name.startswith(HELPERS):
         return None
     kind = name.split(".")[0]
     if kind.startswith(("finger_", "toe_")):
@@ -67,7 +70,7 @@ def rotation_limits(name):
 def install_limits(rig):
     """Use constraints as well as channel locks, so animation respects limits."""
     for pb in rig.pose.bones:
-        helper = pb.name.startswith("forearm_twist.")
+        helper = pb.name.startswith(HELPERS)
         movable = pb.name in ("root", "core")
         pb.lock_location = (not movable,) * 3
         pb.lock_scale = (True,) * 3

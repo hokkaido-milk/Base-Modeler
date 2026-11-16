@@ -10,7 +10,7 @@ import numpy as np
 from pathlib import Path
 import base_modeler as bm
 from base_modeler.topology import repair_tessellation
-from base_modeler.limits import rotation_limits
+from base_modeler.limits import HELPERS, rotation_limits
 
 
 R = Path(__file__).resolve().parents[2]
@@ -79,7 +79,7 @@ def reset():
 
 checks = []
 for pb in rig.pose.bones:
-    if pb.name.startswith("forearm_twist."):
+    if pb.name.startswith(HELPERS):
         continue
     limits = rotation_limits(pb.name)
     for axis in range(3):

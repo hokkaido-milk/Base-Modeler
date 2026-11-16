@@ -1,6 +1,7 @@
 """A native, directly poseable FK skeleton with fitted skin weights."""
 
 import json
+from math import radians
 import bpy
 import numpy as np
 from mathutils import Vector
@@ -9,15 +10,31 @@ from .pose import CENTER_X, smooth
 from .identity import region_name
 from .fitting import SkinSections
 from .digits import chains, bind_digits, bind_nails, joint_blend
-from .limits import install_limits
+from .limits import install_limits, HELPERS
 from . import widgets
 
 TAG = "base_modeler_simple_rig"
-BINDING_SCHEMA = 8
+BINDING_SCHEMA = 9
 # The first binding schema with native joint limits and root/core-only moves.
 LIMITS_SCHEMA = 7
 WEIGHT_STEPS = 32768
 CHEST_Z = 1.21
+# Neutral T-pose joint stations, as lateral distance from the body centerline.
+# The glenohumeral joint sits on the humeral axis under the acromion, where
+# the arm takes over skin ownership from the torso. The wrist is the thinnest
+# forearm section, just proximal to the thumb base; the hand flares beyond it.
+SHOULDER_JOINT = (0.16, 0.02, 1.445)
+ELBOW_X = 0.39
+WRIST_X = 0.58
+WRIST_JOINT = (WRIST_X, -0.03, 1.446)
+# The T-pose deltoid is a contracted dome centred on the shoulder joint, so
+# plain skinning carries it down as a rigid ball when the arm lowers. A hidden
+# helper bone shares the upper arm's rotation and settles the dome inward and
+# down: (medial, down) travel in metres with the arm lowered 90 degrees.
+DELTOID_FOLLOW = 0.6
+DELTOID_SETTLE = (0.015, 0.02)
+DELTOID_PEAK = (0.18, 0.02, 1.48)
+DELTOID_RADIUS = 0.10
 DISPLAY_SCHEMA = 2
 # Per-vertex share of linear skinning, blended over the dual-quaternion result.
 LINEAR_GROUP = "base_modeler_linear_skinning"
@@ -101,31 +118,15 @@ def skeleton():
         def p(x, y, z):
             return (CENTER_X + sign * x, y, z)
 
-        add("shoulder." + side, p(0.035, 0.005, 1.43), p(0.13, 0.005, 1.43), "chest")
-        add(
-            "upper_arm." + side,
-            p(0.13, 0.005, 1.43),
-            p(0.39, 0.005, 1.43),
-            "shoulder." + side,
-        )
-        add(
-            "forearm." + side,
-            p(0.39, 0.005, 1.43),
-            p(0.55, -0.017, 1.436),
-            "upper_arm." + side,
-        )
-        add(
-            "hand." + side,
-            p(0.55, -0.017, 1.436),
-            p(0.65, -0.05, 1.42),
-            "forearm." + side,
-        )
-        add(
-            "forearm_twist." + side,
-            p(0.39, 0.005, 1.43),
-            p(0.55, -0.017, 1.436),
-            "forearm." + side,
-        )
+        shoulder, wrist = p(*SHOULDER_JOINT), p(*WRIST_JOINT)
+        elbow = p(ELBOW_X, 0.005, 1.43)
+        add("shoulder." + side, p(0.035, 0.005, 1.43), shoulder, "chest")
+        add("upper_arm." + side, shoulder, elbow, "shoulder." + side)
+        raised = (shoulder[0], shoulder[1], shoulder[2] + 0.05)
+        add("deltoid." + side, shoulder, raised, "shoulder." + side)
+        add("forearm." + side, elbow, wrist, "upper_arm." + side)
+        add("hand." + side, wrist, p(0.65, -0.05, 1.42), "forearm." + side)
+        add("forearm_twist." + side, elbow, wrist, "forearm." + side)
         add("thigh." + side, p(0.085, 0.015, 0.97), p(0.07, -0.01, 0.56), "pelvis")
         add(
             "shin." + side,
@@ -165,7 +166,9 @@ def fit_skeleton(reference, current, skin_indices, skin_triangles=None):
         else None
     )
     stations = {
-        round(CENTER_X + sign * x, 6) for sign in (-1, 1) for x in (0.39, 0.55, 0.65)
+        round(CENTER_X + sign * x, 6)
+        for sign in (-1, 1)
+        for x in (ELBOW_X, WRIST_X, 0.65)
     }
 
     def fit(point, limb=False, digit=None):
@@ -290,6 +293,11 @@ def skin_weights(points, arm_ownership, names):
         z,
     )
     arms = arm_ownership * smooth(1.25, 1.36, z)
+    # The deltoid inserts on the humerus: above the joint its cap commits to
+    # the arm over a shorter span, so a lowered arm keeps a round shoulder
+    # instead of a raised pad. The axilla below keeps its long, soft blend.
+    cap = smooth(SHOULDER_JOINT[2] - 0.015, SHOULDER_JOINT[2] + 0.015, z)
+    arms = arms + cap * (smooth(0.0, 1.0, arms) - arms)
     w *= ((1 - arms) * (1 - legs))[:, None]
     for side, sign in (("L", 1), ("R", -1)):
         side_mask = (x * sign >= 0).astype(np.float32)
@@ -312,7 +320,8 @@ def skin_weights(points, arm_ownership, names):
         # blends locally around its actual elbow/wrist or knee/ankle.
         clavicle = 1 - joint_blend(0.085, 0.165, ax)
         fore = joint_blend(0.35, 0.43, ax)
-        hand = smooth(0.53, 0.575, ax)
+        # Centre the wrist blend on the joint, ending before the thumb base.
+        hand = smooth(WRIST_X - 0.024, WRIST_X + 0.022, ax)
         a = arms * side_mask
         for name, value in (
             ("shoulder", clavicle),
@@ -401,12 +410,21 @@ def bind_weights(cache, reference, names, bones):
     # Transfer these skin weights to the muscle shells below, never paint each
     # overlaid surface independently at a potentially different joint station.
     ax = abs(reference[:, 0] - CENTER_X)
-    proximal_twist = 1 - smooth(0.40, 0.55, ax)
+    proximal_twist = 1 - smooth(0.40, WRIST_X, ax)
     for side in ("L", "R"):
         fore = names.index("forearm." + side)
         helper = names.index("forearm_twist." + side)
         weights[:, helper] = weights[:, fore] * proximal_twist
         weights[:, fore] -= weights[:, helper]
+    # The deltoid helper takes a smooth share of the dome above the joint
+    # from whichever bones own it, so the settle fades out with no seam.
+    for side, sign in (("L", 1), ("R", -1)):
+        peak = np.array(DELTOID_PEAK, np.float32)
+        peak[0] = CENTER_X + sign * peak[0]
+        distance = np.linalg.norm(reference - peak, axis=1)
+        share = 1 - smooth(0.0, DELTOID_RADIUS, distance)
+        weights *= (1 - share)[:, None]
+        weights[:, names.index("deltoid." + side)] = share
     bvh = BVHTree.FromPolygons(surface, tri, all_triangles=True)
     for ob, a, b in cache["slices"]:
         # The broad abdominal sheets need a coherent lumbar field through
@@ -606,7 +624,7 @@ def generate(context, root, cache, reference):
                 else "Body"
             )
             collections[category].assign(bone)
-            if name.startswith("forearm_twist."):
+            if name.startswith(HELPERS):
                 collections[category].unassign(bone)
                 collections["Deformation"].assign(bone)
             if parent:
@@ -651,6 +669,31 @@ def generate(context, root, cache, reference):
             counter.mix_mode = "AFTER"
             counter.euler_order = "YZX"
             counter.influence = 0.75
+            deltoid = rig.pose.bones["deltoid." + side]
+            follow = deltoid.constraints.new("COPY_ROTATION")
+            follow.name = "Deltoid follow"
+            follow.target = rig
+            follow.subtarget = "upper_arm." + side
+            follow.target_space = "LOCAL_OWNER_ORIENT"
+            follow.owner_space = "LOCAL"
+            follow.influence = DELTOID_FOLLOW
+            settle = deltoid.constraints.new("TRANSFORM")
+            settle.name = "Deltoid settle"
+            settle.target = rig
+            settle.subtarget = "upper_arm." + side
+            settle.target_space = settle.owner_space = "LOCAL"
+            settle.map_from = "ROTATION"
+            settle.from_rotation_mode = "XYZ"
+            settle.from_min_x_rot = radians(-90)
+            settle.from_max_x_rot = 0.0
+            settle.map_to = "LOCATION"
+            settle.map_to_x_from = settle.map_to_y_from = "X"
+            settle.map_to_z_from = "Y"
+            sign = 1 if side == "L" else -1
+            settle.to_min_x = -sign * DELTOID_SETTLE[0]
+            settle.to_min_y = -DELTOID_SETTLE[1]
+            settle.to_max_x = settle.to_max_y = 0.0
+            settle.mix_mode = "ADD"
         # A Mixamo-style central control carries the torso and shares its
         # motion with the hips. Independent spine/pelvis edits remain available.
         pelvis = rig.pose.bones["pelvis"]

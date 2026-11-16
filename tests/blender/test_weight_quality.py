@@ -101,7 +101,9 @@ for side, sign in (("L", 1), ("R", -1)):
             shares.append((abs(source[v.index, 0] - bm.deform.CENTER_X), h / (f + h)))
     shares = np.array(shares)
     near = shares[(shares[:, 0] > 0.44) & (shares[:, 0] < 0.46), 1]
-    far = shares[(shares[:, 0] > 0.52) & (shares[:, 0] < 0.54), 1]
+    # The helper's share fades out just proximal to the wrist joint.
+    wrist = bm.rig.WRIST_X
+    far = shares[(shares[:, 0] > wrist - 0.03) & (shares[:, 0] < wrist - 0.01), 1]
     assert len(near) > 10 and len(far) > 10
     assert np.median(near) > 0.6 and np.median(far) < 0.15, (
         side,

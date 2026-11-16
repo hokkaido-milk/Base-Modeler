@@ -1,7 +1,7 @@
 # Base Modeler
 
 Shape an adult anime body with 27 continuous controls, then generate a native
-83-bone FK rig (81 controls plus two hidden twist bones) for posing. The foundation, anatomy corrections and face texture
+85-bone FK rig (81 controls plus four hidden helper bones) for posing. The foundation, anatomy corrections and face texture
 are bundled. No external generator or Rigify is required. The only network access
 is an optional update check against this project's GitHub releases.
 
